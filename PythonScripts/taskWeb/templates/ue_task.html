@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+<table class="table table-striped" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">队列</th>
+      <th scope="col">任务ID</th>
+      <th scope="col">任务类型</th>
+        <th scope="col">任务状态</th>
+         <th scope="col">路径</th>
+        <th scope="col">时间</th>
+        <th scope="col">操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for each in dic.get('wait') %}
+        <tr class="bg-light">
+      <th scope="row">{{ dic.get('wait').index(each)}}</th>
+            <td >{{ each.get('TaskId')}}</td>
+            <td >{{ each.get('TaskType') }}</td>
+            <td >{{ each.get('taskStatus') }}</td>
+            <td >{{ each.get('XmlFile') }}</td>
+            <td >{{ each.get('date') }}</td>
+        <td ><button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
+        </tr>
+    {% endfor %}
+    {% for each in dic.get('running') %}
+        <tr class="bg-info">
+      <th scope="row">{{ dic.get('running').index(each)}}</th>
+            <td >{{ each.get('TaskId')}}</td>
+            <td >{{ each.get('TaskType') }}</td>
+            <td >{{ each.get('taskStatus') }}</td>
+            <td >{{ each.get('XmlFile') }}</td>
+            <td >{{ each.get('date') }}</td>
+            <td ></td>
+        <!--<td ><button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>-->
+        </tr>
+    {% endfor %}
+  {% for each in dic.get('success') %}
+        <tr class="bg-success">
+      <th scope="row">{{ dic.get('success').index(each)}}</th>
+            <td >{{ each.get('TaskId')}}</td>
+            <td >{{ each.get('TaskType') }}</td>
+            <td >{{ each.get('taskStatus') }}</td>
+            <td >{{ each.get('XmlFile') }}</td>
+            <td >{{ each.get('date') }}</td>
+            <td ></td>
+        <td ><button type="button" class="btn btn-primary" onclick="commit(this)" id="{{ each['TaskId'] }}">重新提交</button></td>
+        </tr>
+    {% endfor %}
+  {% for each in dic.get('failed') %}
+        <tr class="bg-danger">
+      <th scope="row">{{ dic.get('failed').index(each)}}</th>
+            <td >{{ each.get('TaskId')}}</td>
+            <td >{{ each.get('TaskType') }}</td>
+            <td >{{ each.get('taskStatus') }}</td>
+            <td >{{ each.get('XmlFile') }}</td>
+            <td >{{ each.get('date') }}</td>
+        <td ><button type="button" class="btn btn-primary" onclick="commit(this)" id="{{ each['TaskId'] }}">重新提交</button>
+        <button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
+        </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+
+</body>
+<script type="text/javascript">
+        function del(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/ue/con?action=del",ad_info ,
+  function(data,status){
+        window.location.reload(true);
+    });
+    }
+
+
+        function commit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/ue/con?action=repost",ad_info ,
+      function(data,status){
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+            window.location.reload(true)
+        }
+
+    </script>
+
+</html>

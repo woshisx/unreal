@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+<div class="container">
+  <div class="row align-items-start" style="height: 200px">
+    <div class="col">
+    </div>
+    <div class="col">
+    </div>
+    <div class="col">
+    </div>
+  </div>
+  <div class="row align-items-center">
+    <div class="col">
+        <a class="nav-link" href="/maya/task">
+      <div class="card" style="width: 18rem;">
+  <img class="card-img-top" src="../static/images/maya.gif" alt="Card image cap">
+  <div class="card-body">
+    <p class="card-text">Maya</p>
+  </div>
+</div>
+            </a>
+    </div>
+    <div class="col">
+        <a class="nav-link" href="/ue/task">
+     <div class="card" style="width: 18rem;">
+  <img class="card-img-top" src="../static/images/ue.gif" alt="Card image cap">
+  <div class="card-body">
+    <p class="card-text">UE</p>
+  </div>
+</div>
+            </a>
+    </div>
+    <div class="col">
+        <a class="nav-link" href="/ue/render">
+      <div class="card" style="width: 18rem;">
+  <img class="card-img-top" src="../static/images/render.gif" alt="Card image cap">
+  <div class="card-body">
+    <p class="card-text">Render</p>
+  </div>
+</div>
+            </a>
+    </div>
+  </div>
+  <div class="row align-items-end">
+    <div class="col">
+
+    </div>
+    <div class="col">
+
+    </div>
+    <div class="col">
+
+    </div>
+  </div>
+</div>
+</body>
+<script type="text/javascript">
+        function del(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=delete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+     function del_fail(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=delete_fail",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+        function commit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/admin/ad_post?action=commit",ad_info ,
+      function(data,status){
+                if(data==='提交成功'){item.remove()}
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+        }
+
+        function recommit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/admin/ad_post?action=recommit",ad_info ,
+      function(data,status){
+                if(data==='提交成功'){item.remove()}
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+        }
+
+
+    </script>
+
+</html>

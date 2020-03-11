@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+<table class="table table-striped" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">等待队列</th>
+      <th scope="col">任务信息</th>
+      <th scope="col">时间</th>
+        <th scope="col">地址</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for each in dic['render_wait'] %}
+        <tr>
+      <th scope="row">{{ dic['render_wait'].index(each)}}</th>
+            <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
+            <td >{{ each.get('date') }}</td>
+        <td >{{ each.get('addr') }}</td>
+        <td ><button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
+        </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<table class="table table-hover table-dark" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">正在渲染</th>
+       <th scope="col">任务信息</th>
+       <th scope="col">时间</th>
+        <th scope="col">地址</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    {% for each in dic['rendering'] %}
+        <tr class="bg-info">
+      <th scope="row">{{ dic['rendering'].index(each)}}</th>
+        <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
+        <td >{{ each.get('date') }}</td>
+        <td >{{ each.get('addr') }}</td>
+        </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+<table class="table table-hover table-dark" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">渲染失败</th>
+        <th scope="col">任务信息</th>
+       <th scope="col">时间</th>
+        <th scope="col">地址</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for each in dic['render_failed'] %}
+        <tr class="bg-danger">
+      <th scope="row">{{ dic['render_failed'].index(each)}}</th>
+            <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
+            <td >{{ each.get('date') }}</td>
+            <td >{{ each.get('addr') }}</td>
+            <td ><button type="button" class="btn btn-success" onclick="commit(this)" id="{{ each['TaskId'] }}">重新提交</button>
+            <button type="button" class="btn btn-success" onclick="del_fail(this)" id="{{ each['TaskId'] }}">删除</button>
+            </td>
+        </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+<table class="table table-hover table-dark" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">渲染成功</th>
+        <th scope="col">任务信息</th>
+       <th scope="col">时间</th>
+        <th scope="col">地址</th>
+
+    </tr>
+  </thead>
+  <tbody>
+
+    {% for each in dic['render_success'] %}
+        <tr class="bg-success">
+      <th scope="row">{{ dic['render_success'].index(each)}}</th>
+            <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
+            <td >{{ each.get('date') }}</td>
+            <td >{{ each.get('addr') }}</td>
+        </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+</body>
+<script type="text/javascript">
+        function del(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderWaitDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+     function del_fail(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderFailedDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+        function commit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/admin/ad_post?action=ueRenderCommit",ad_info ,
+      function(data,status){
+                if(data==='提交成功'){item.remove()}
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+        }
+
+
+    </script>
+
+</html>

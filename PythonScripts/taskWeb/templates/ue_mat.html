@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+<table class="table table-striped" style="width: 85%;margin-left: 20px">
+  <thead>
+    <tr>
+      <th scope="col">预览</th>
+      <th scope="col">材质模板名</th>
+      <th scope="col">材质插槽</th>
+        <th scope="col">地址</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for each in dic['render_wait'] %}
+        <tr>
+      <th scope="row">{{ dic['render_wait'].index(each)}}</th>
+            <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
+            <td >{{ each.get('date') }}</td>
+        <td >{{ each.get('addr') }}</td>
+        <td ><button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
+        </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</body>
+<script type="text/javascript">
+        function del(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderWaitDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+     function del_fail(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderFailedDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+        function commit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/admin/ad_post?action=ueRenderCommit",ad_info ,
+      function(data,status){
+                if(data==='提交成功'){item.remove()}
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+        }
+
+
+    </script>
+
+</html>
