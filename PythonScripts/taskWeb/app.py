@@ -31,11 +31,11 @@ def maya_task():
     if action == 'post':
         data = json.loads(request.data)
         if db.maya.find({'TaskId': data['TaskId']}).count():
-            return json.dumps({'info':'task is exist,do not repeat upload'})
+            return u'任务已存在，不要重复提交'
         else:
             data['date'] = str(datetime.now()).split('.')[0]
             db.maya.insert(data)
-            return json.dumps({'info': 'upload success'})
+            return u'任务提交成功'
     if action == 'del':
         data = request.form.to_dict()
         if not db.maya.find({'TaskId': data['TaskId']}).count():

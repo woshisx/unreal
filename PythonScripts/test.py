@@ -1,70 +1,61 @@
-# -*- coding: UTF-8 -*-
-from PySide2.QtGui import QPixmap, QPainter
-from PySide2.QtWidgets import QWidget
+# -*- coding: utf-8 -*-
+from PySide2.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QMenu,\
+    QAction
 
+class Window(QWidget):
 
-__Author__ = """By: Irony
-QQ: 892768447
-Email: 892768447@qq.com"""
-__Copyright__ = "Copyright (c) 2018 Irony"
-__Version__ = "Version 1.0"
+    def __init__(self, *args, **kwargs):
+        super(Window, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(self)
+        self.labelInfo = QLabel(self)
+        self.button = QPushButton(u'带按钮的菜单', self)
+        layout.addWidget(self.labelInfo)
+        layout.addWidget(self.button)
 
+        # 添加菜单
+        self._initMenu()
 
-class SlippedImgWidget(QWidget):
+    def _initMenu(self):
+        # 创建菜单
+        self._menu = QMenu(self.button)
+        # 替换menu的鼠标释放事件达到选择性不关闭菜单
+        self._menu.mouseReleaseEvent = self._menu_mouseReleaseEvent
+        self._menu.addAction(u'菜单1', self._checkAction)
+        self._menu.addAction(u'菜单2', self._checkAction)
+        self._menu.addAction(
+            QAction(u'菜单3', self._menu, triggered=self._checkAction))
+        action = QAction(u'菜单4', self._menu, triggered=self._checkAction)
+        # 添加自定义的属性,判断该属性可以关闭菜单
+        action.setProperty('canHide', True)
+        self._menu.addAction(action)
+        for action in self._menu.actions():
+            # 循环设置可勾选
+            action.setCheckable(True)
+        self.button.setMenu(self._menu)
 
-    def __init__(self, bg, fg, *args, **kwargs):
-        super(SlippedImgWidget, self).__init__(*args, **kwargs)
-        # 开启鼠标跟踪
-        self.setMouseTracking(True)
-        # 背景
-        self.bgPixmap = QPixmap(bg)
-        # 前景
-        self.pePixmap = QPixmap(fg)
-        # 最小尺寸(背景右边和下方隐藏10个像素)
-        size = self.bgPixmap.size()
-        self.setMinimumSize(size.width() - 10, size.height() - 10)
-        self.setMaximumSize(size.width() - 10, size.height() - 10)
-        # 分成10份用于鼠标移动判断
-        self.stepX = size.width() / 10
-        self.stepY = size.height() / 10
-        # 偏移量
-        self._offsets = [-4, -4, -4, -4]  # 背景(-4,-4),前景(-4,-4)
+    def _menu_mouseReleaseEvent(self, event):
+        action = self._menu.actionAt(event.pos())
+        if not action:
+            # 没有找到action就交给QMenu自己处理
+            return QMenu.mouseReleaseEvent(self._menu, event)
+        if action.property('canHide'):  # 如果有该属性则给菜单自己处理
+            return QMenu.mouseReleaseEvent(self._menu, event)
+        # 找到了QAction则只触发Action
+        action.activate(action.Trigger)
 
-    def mouseMoveEvent(self, event):
-        super(SlippedImgWidget, self).mouseMoveEvent(event)
-        pos = event.pos()
-
-        # 偏移量
-        offsetX = 5 - int(pos.x() / self.stepX)
-        offsetY = 5 - int(pos.y() / self.stepY)
-        self._offsets[0] = offsetX
-        self._offsets[1] = offsetY
-        self._offsets[2] = offsetX
-        self._offsets[3] = offsetY
-        # 刷新
-        self.update()
-
-    def paintEvent(self, event):
-        super(SlippedImgWidget, self).paintEvent(event)
-        # 绘制图形
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        # 左上角偏移5个像素画背景图片
-        painter.drawPixmap(
-            -5 + self._offsets[0],
-            -5 + self._offsets[1], self.bgPixmap)
-        # 右下角偏移5个像素画前景图片
-        painter.drawPixmap(
-            self.width() - self.pePixmap.width() + 5 - self._offsets[2],
-            self.height() - self.pePixmap.height() + 5 - self._offsets[3],
-            self.pePixmap
-        )
+    def _checkAction(self):
+        # 三个action都响应该函数
+        self.labelInfo.setText('\n'.join([u'{}\t选中：{}'.format(
+            action.text(), action.isChecked()) for action in self._menu.actions()]))
 
 
 if __name__ == '__main__':
     import sys
+    import cgitb
+    sys.excepthook = cgitb.enable(1, None, 5, 'text')
     from PySide2.QtWidgets import QApplication
     app = QApplication(sys.argv)
-    w = SlippedImgWidget('Data/bg1.jpg', 'Data/fg1.png')
+    w = Window()
+    w.resize(400, 400)
     w.show()
     sys.exit(app.exec_())
