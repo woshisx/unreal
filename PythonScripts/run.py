@@ -1,8 +1,2 @@
-#!/usr/bin/env python
-# coding=utf-8
-import os,shutil
-import sys
 import unreal
-des = unreal.SystemLibrary.get_project_content_directory()
-shutil.copytree('C:/Users/chenxing/Documents/Unreal Projects/server/Content/CSXXM','%s/CSXXM'%des)
-unreal.load_asset()
+print(unreal.EditorAssetLibrary.sync_browser_to_objects(asset_paths=['/Game/Content/JSZJD_S01/shot_work/ep001/sc01/seq1/lighting/Animation']))

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
+import sys,os,json
+config = json.loads(open(os.path.dirname(os.path.dirname(__file__)).replace('\\','/')+'/config.json').read())
+ip = config.get('public_disk')
+sys.path.append('//%s/LocalShare/py27/Lib'%ip)
+sys.path.append('//%s/LocalShare/py27/Lib/site-packages'%ip)
 from flask import Flask,render_template,url_for,request,redirect,Blueprint,session,flash
-import os,json,sys,time
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 app = Flask(__name__)

@@ -15,7 +15,7 @@ st = Strack(base_url="https://strack.teamones.com/", login_name="strack", passwo
 # asset_list = st.select('department').get('rows')
 # print(str(asset_list).decode('unicode_escape'))
 # list = st.select('session'[['code' , 'is' , 'sc01'],['project_id' , 'is' , 1],['parent_id' , 'is' , 14]]).get('rows')
-list = st.select('episode')
+list = st.find('asset',[['project_id','is',4]])
 print list
 data ={
     'project_id':1,

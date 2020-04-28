@@ -51,7 +51,8 @@
             <td >{{ each.get('XmlFile') }}</td>
             <td >{{ each.get('date') }}</td>
             <td ></td>
-        <td ><button type="button" class="btn btn-primary" onclick="commit(this)" id="{{ each['TaskId'] }}">重新提交</button></td>
+        <td ><button type="button" class="btn btn-primary" onclick="commit(this)" id="{{ each['TaskId'] }}">重新提交</button>
+        <button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
         </tr>
     {% endfor %}
   {% for each in dic.get('failed') %}
