@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
-import sys,os,json
-cofig = json.loads(open(os.path.dirname(__file__).replace('\\','/')+'/config.json').read())
+import sys,os,json,threading
+local = os.path.dirname(__file__).replace('\\','/')
+cofig = json.loads(open('%s/config.json'%local).read())
 public_disk = cofig.get('public_disk')
 node_server = cofig.get('node_server')
 sys.path.append('//%s/LocalShare/py27/Lib'%public_disk)
 sys.path.append('//%s/LocalShare/py27/Lib/site-packages'%public_disk)
+sys.path.append(os.path.dirname(__file__).replace('\\','/'))
 import re,shutil,json,random,threading,socket,time,datetime
 from xml.etree.ElementTree import Element, SubElement, ElementTree
 import xml.etree.ElementTree as ET
+from strack_api.strack import Strack
+from PySide2 import QtCore, QtGui, QtWidgets
+from PySide2.QtCore import QSize, Property, QTimer, Qt,QThread,Signal
+from PySide2.QtGui import QColor, QPainter
+from PySide2.QtWidgets import QWidget, QHBoxLayout,QMainWindow
 try:
     import requests
 except:
@@ -29,8 +36,7 @@ try:
     import mocap_module
 except:
     pass
-from strack_api.strack import Strack
-from PySide2 import QtCore, QtGui, QtWidgets
+
 class Mobu:
     def __init__(self):
         pass
@@ -496,7 +502,12 @@ class UE:
         # 没这句就自动生成skeleton mesh了
         options.set_editor_property('automated_import_should_detect_type', False)
         return options
-
+class Thread(QThread):
+    def __init__(self,fun):
+        self.fun = fun
+        super(Thread,self).__init__()
+    def run(self):
+        self.fun()
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
@@ -782,7 +793,7 @@ class Ui_MainWindow(object):
         self.tab = QtWidgets.QWidget()
         self.tab.setObjectName("tab")
         self.tabWidget = QtWidgets.QTabWidget(self.tab)
-        self.tabWidget.setGeometry(QtCore.QRect(0, 0, 271, 521))
+        self.tabWidget.setGeometry(QtCore.QRect(0, 0, 271, 510))
         self.tabWidget.setObjectName("tabWidget")
         self.layout_tab = QtWidgets.QWidget()
         self.layout_tab.setObjectName("layout_tab")
@@ -790,6 +801,11 @@ class Ui_MainWindow(object):
         self.anim_tab = QtWidgets.QWidget()
         self.anim_tab.setObjectName("anim_tab")
         self.tabWidget.addTab(self.anim_tab, "")
+        self.progressBar = QtWidgets.QProgressBar(self.tab)
+        self.progressBar.setGeometry(QtCore.QRect(0, 508, 268, 20))
+        self.progressBar.setProperty("value", 0)
+        self.progressBar.setTextVisible(False)
+        self.progressBar.setObjectName("progressBar")
         self.dealWidget.addTab(self.tab, "")
         self.refesh_button = QtWidgets.QPushButton(self.centralwidget)
         self.refesh_button.setGeometry(QtCore.QRect(860, 1, 25, 25))
@@ -959,13 +975,6 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
     def __init__(self,myStrack,local_path):
         self.taskServer = node_server
         self.strack = myStrack
-        self.asset_data = self.strack.asset_task()
-        self.shot_data = self.strack.shot_task()
-        self.level_data = self.strack.level_task()
-        self.project_data = self.strack.projectTable()
-        self.status_data = self.strack.statusTable()
-        self.episode_data = self.strack.episodeTable()
-        self.session_data = self.strack.sessionTable()
         self.local_path = local_path
         self.now = datetime.datetime.now()
         self.deadline = self.now + datetime.timedelta(days=300)
@@ -1016,13 +1025,25 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
         self.worker = ''
-        self.refeshAssetTree()
-        self.refeshShotTree()
-        self.refeshLevelTree()
-        self.additem_init()
         self.cirInit()
         self.Qpix = QtGui.QPixmap(201, 201)
         self.Qpix.fill(QtCore.Qt.transparent)
+        self.dataInit()
+    def dataInit(self):
+        cacheFile = '//%s/LocalShare/teamones/cache.json'%public_disk
+        if os.path.exists(cacheFile):
+            cache = json.loads(open(cacheFile).read())
+            self.asset_data = cache.get('asset_data')
+            self.shot_data = cache.get('shot_data')
+            self.level_data = cache.get('level_data')
+            self.project_data = cache.get('project_data')
+            self.status_data = cache.get('status_data')
+            self.episode_data = cache.get('episode_data')
+            self.session_data = cache.get('session_data')
+            self.additem_init()
+            self.refeshAssetTree()
+            self.refeshShotTree()
+            self.refeshLevelTree()
     def cirInit(self):
         self.angle = 1
         self.cirX = 0
@@ -1687,13 +1708,6 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.taskServer = node_server
         self.mobu = Mobu()
         self.strack = myStrack
-        self.asset_data = self.strack.asset_task()
-        self.shot_data = self.strack.shot_task()
-        self.level_data = self.strack.level_task()
-        self.project_data = self.strack.projectTable()
-        self.status_data = self.strack.statusTable()
-        self.episode_data = self.strack.episodeTable()
-        self.session_data = self.strack.sessionTable()
         self.local_path = local_path
         self.now = datetime.datetime.now()
         self.deadline = self.now + datetime.timedelta(days=300)
@@ -1744,14 +1758,26 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
         self.worker = ''
-        self.refeshAssetTree()
-        self.refeshShotTree()
-        self.refeshLevelTree()
-        self.additem_init()
         self.cirInit()
         self.Qpix = QtGui.QPixmap(201, 201)
         self.Qpix.fill(QtCore.Qt.transparent)
+        self.dataInit()
 
+    def dataInit(self):
+        cacheFile = '//%s/LocalShare/teamones/cache.json' % public_disk
+        if os.path.exists(cacheFile):
+            cache = json.loads(open(cacheFile).read())
+            self.asset_data = cache.get('asset_data')
+            self.shot_data = cache.get('shot_data')
+            self.level_data = cache.get('level_data')
+            self.project_data = cache.get('project_data')
+            self.status_data = cache.get('status_data')
+            self.episode_data = cache.get('episode_data')
+            self.session_data = cache.get('session_data')
+            self.additem_init()
+            self.refeshAssetTree()
+            self.refeshShotTree()
+            self.refeshLevelTree()
     def cirInit(self):
         self.angle = 1
         self.cirX = 0
@@ -2384,13 +2410,6 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
     def __init__(self,myStrack,local_path):
         self.ue = UE()
         self.strack = myStrack
-        self.asset_data = self.strack.asset_task()
-        self.shot_data = self.strack.shot_task()
-        self.level_data = self.strack.level_task()
-        self.project_data = self.strack.projectTable()
-        self.status_data = self.strack.statusTable()
-        self.episode_data = self.strack.episodeTable()
-        self.session_data = self.strack.sessionTable()
         self.local_path = local_path
         self.now = datetime.datetime.now()
         self.deadline = self.now + datetime.timedelta(days=300)
@@ -2441,10 +2460,22 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
         self.worker = ''
-        self.refeshAssetTree()
-        self.refeshShotTree()
-        self.refeshLevelTree()
-        self.additem_init()
+        self.dataInit()
+    def dataInit(self):
+        cacheFile = '//%s/LocalShare/teamones/cache.json'%public_disk
+        if os.path.exists(cacheFile):
+            cache = json.loads(open(cacheFile).read())
+            self.asset_data = cache.get('asset_data')
+            self.shot_data = cache.get('shot_data')
+            self.level_data = cache.get('level_data')
+            self.project_data = cache.get('project_data')
+            self.status_data = cache.get('status_data')
+            self.episode_data = cache.get('episode_data')
+            self.session_data = cache.get('session_data')
+            self.additem_init()
+            self.refeshAssetTree()
+            self.refeshShotTree()
+            self.refeshLevelTree()
 
     def myTask(self):
         self.worker = self.strack.st.login_name
@@ -2937,8 +2968,8 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.close_button.setIcon(QtGui.QIcon(QtGui.QPixmap('%s/images/12.jpg'%self.local_path)))
         self.min_button.setIcon(QtGui.QIcon(QtGui.QPixmap('%s/images/13.jpg' % self.local_path)))
         self.setStyleSheet('QMainWindow{border-image :url(%s/images/11.jpg);}' % self.local_path)
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-
+        # self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             self.m_drag = True
@@ -3010,10 +3041,6 @@ class MyLogin(QtWidgets.QMainWindow,Ui_Form):
             QtWidgets.QMessageBox.warning(self,u"提示", u"用户名或密码错误")
         if myStrack:
             self.hide()
-            app = QtWidgets.QApplication.instance()
-            if app is None:
-                # this must excu or will crash
-                app = QtWidgets.QApplication(sys.argv)
             if software == 'Unreal':
                 self.window = unrealWidget(myStrack, self.local_path)
                 self.window.show()
