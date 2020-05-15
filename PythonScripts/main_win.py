@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
-import sys,os,json,threading
+import sys,os,json
 local = os.path.dirname(__file__).replace('\\','/')
 cofig = json.loads(open('%s/config.json'%local).read())
 public_disk = cofig.get('public_disk')
 node_server = cofig.get('node_server')
+globalData = []
 sys.path.append('//%s/LocalShare/py27/Lib'%public_disk)
 sys.path.append('//%s/LocalShare/py27/Lib/site-packages'%public_disk)
 sys.path.append(os.path.dirname(__file__).replace('\\','/'))
-import re,shutil,json,random,threading,socket,time,datetime
+import re,shutil,json,random,threading,socket,time,datetime,glob,base64
 from xml.etree.ElementTree import Element, SubElement, ElementTree
 import xml.etree.ElementTree as ET
 from strack_api.strack import Strack
 from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2.QtCore import QSize, Property, QTimer, Qt,QThread,Signal
-from PySide2.QtGui import QColor, QPainter
-from PySide2.QtWidgets import QWidget, QHBoxLayout,QMainWindow
+from PySide2.QtCore import QSize, Property, QTimer, Qt,QThread,Signal,QUrl
+from PySide2.QtGui import QColor, QPainter,QIcon,QFont,QPixmap
+from PySide2.QtWidgets import QTableWidget,QTableWidgetItem,QAbstractItemView,QComboBox
+from PySide2.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 try:
     import requests
 except:
     pass
 try:
     import unreal
+    from import_staticmesh import StaticTextureMeshTask
 except:
     pass
 try:
@@ -36,10 +39,301 @@ try:
     import mocap_module
 except:
     pass
+class ShotTable(QtWidgets.QMainWindow):
+    def __init__(self,data):
+        self.charActTpyeDict = {u'文戏':'Drama',u'动作戏':'Drama',u'武戏':'martialarts'}
+        self.charMoveSpeedDict = {u'慢速': 'Slow', u'中速': 'Medium', u'快速': 'Fast', u'瞬速': 'Flash'}
+        QtWidgets.QMainWindow.__init__(self)
+        self.resize(1000, 400)
+        self.setWindowTitle('镜头表单')
+        self.camList = data.get('shot')
+        self.charList = data.get('char')
+        self.tableWidget = QtWidgets.QTableWidget(self)
+        self.tableWidget.setGeometry(QtCore.QRect(0, 0, 1000, 280))
+        self.tableWidget.setObjectName("tableWidget")
+        self.pushButton = QtWidgets.QPushButton(self)
+        self.pushButton.setGeometry(QtCore.QRect(420, 320, 75, 23))
+        self.pushButton.setObjectName("pushButton")
+        self.pushButton.setText('提交')
+        self.tableWidget.setColumnCount(8)
+        self.tableWidget.setRowCount(len(self.camList))
+        self.tableWidget.setColumnWidth(0, 80)
+        self.tableWidget.setColumnWidth(1, 60)
+        self.tableWidget.setColumnWidth(2, 60)
+        self.tableWidget.setColumnWidth(3, 90)
+        self.tableWidget.setColumnWidth(4, 90)
+        self.tableWidget.setColumnWidth(5, 240)
+        self.tableWidget.setColumnWidth(6, 150)
+        self.tableWidget.setColumnWidth(7, 180)
+        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableWidget.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tableWidget.setHorizontalHeaderLabels(["相机名", "开始帧", "结束帧", "角色表演类型", "角色运动速度","焦点", "镜头分类", "镜头类型"])
+        self.table()
+        self.pushButton.clicked.connect(self.infoSelect)
+    def listFileByTimeReversed(self,path, reverse=False):
+        return sorted(glob.glob(os.path.join(path, '*')),
+                      key=lambda x: time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getctime(x))),
+                      reverse=reverse)
+    def table(self):
+        for i,cam in enumerate(self.camList):
+            twi = QTableWidgetItem(cam)
+            twi.setFont(QFont("Times", 10, ))
+            self.tableWidget.setItem(i,0,twi)
+            self.tableWidget.setCellWidget(i, 1, self.frameInput())
+            self.tableWidget.setCellWidget(i, 2, self.frameInput())
+            self.tableWidget.setCellWidget(i, 3, self.CharacterActCombo())
+            self.tableWidget.setCellWidget(i, 4, self.CharacterSpeedCombo())
+            self.tableWidget.setCellWidget(i, 5, self.charWidget())
+            Combo1 = self.LensTypeCombo(i)
+            self.tableWidget.setCellWidget(i,6,Combo1)
+            self.tableWidget.setCellWidget(i,7, self.LensitemsCombo(i))
+            Combo1.currentIndexChanged.connect(self.refeshLensitemsCombo)
+    def LensTypeCombo(self,index):
+        cbw = QComboBox()
+        for i,each in enumerate(self.listFileByTimeReversed('%s/images/LensType'%local)):
+            code = os.path.basename(each).split('.')[0]
+            cbw.addItem(code)
+            cbw.setIconSize(QtCore.QSize(100, 100))
+            icon = QIcon('%s/images/LensType/%s.png'%(local,code))
+            cbw.setItemIcon(i,icon)
+            cbw.setObjectName("checkBox_%s_01"%index)
+        return cbw
+    def LensitemsCombo(self,index):
+        cbw = QComboBox()
+        cbw.setIconSize(QtCore.QSize(100, 100))
+        cbw.setObjectName("checkBox_%s_02" % index)
+        for i, each in enumerate(self.listFileByTimeReversed('%s/images/SCU' % (local))):
+            code = os.path.basename(each).split('.')[0]
+            cbw.addItem(code)
+            icon = QIcon('%s/images/SCU/%s.png' % (local,code))
+            cbw.setItemIcon(i, icon)
+        return cbw
+    def refeshLensitemsCombo(self):
+        Combo1 = self.sender()
+        index = Combo1.objectName().split('_')[1]
+        Combo2 = self.findChild(QComboBox,"checkBox_%s_02"%index)
+        shotType = Combo1.currentText()
+        Combo2.clear()
+        for i, each in enumerate(self.listFileByTimeReversed('%s/images/%s' % (local,shotType))):
+            code = os.path.basename(each).split('.')[0]
+            Combo2.addItem(code)
+            icon = QIcon('%s/images/%s/%s.png' % (local,shotType, code))
+            Combo2.setItemIcon(i, icon)
+    def LightTypeCombo(self):
+        cbw = QComboBox()
+        for i,each in enumerate(self.listFileByTimeReversed('%s/images/LightType'%local)):
+            code = os.path.basename(each).split('.')[0]
+            cbw.addItem(code)
+            cbw.setIconSize(QtCore.QSize(150, 150))
+            icon = QIcon('%s/images/LightType/%s.png'%(local,code))
+            cbw.setItemIcon(i,icon)
+        return cbw
+    def CharacterSpeedCombo(self):
+        cbw = QComboBox()
+        cbw.addItem('慢速')
+        cbw.addItem('中速')
+        cbw.addItem('快速')
+        cbw.addItem('瞬速')
+        return cbw
+    def CharacterActCombo(self):
+        cbw = QComboBox()
+        cbw.addItem('文戏')
+        cbw.addItem('动作戏')
+        cbw.addItem('武戏')
+        return cbw
+    def frameInput(self):
+        sb = QtWidgets.QSpinBox()
+        sb.setRange(0, 10000)
+        sb.setValue(0)
+        sb.setDisplayIntegerBase(10)
+        sb.setSingleStep(1)
+        return sb
+    def charWidget(self):
+        QHLayoutWidget = QtWidgets.QWidget()
+        QHLayoutWidget.setGeometry(QtCore.QRect(300, 150, 0, 0))
+        QHLayoutWidget.setObjectName("QHLayoutWidget")
+        QHLayout = QtWidgets.QHBoxLayout(QHLayoutWidget)
+        QHLayout.setContentsMargins(0, 0, 0, 0)
+        QHLayout.setObjectName("QHLayout")
+        for item in self.charList:
+            checkBox = QtWidgets.QCheckBox(QHLayoutWidget)
+            checkBox.setText(item)
+            QHLayout.addWidget(checkBox)
+        return QHLayoutWidget
+    def infoSelect(self):
+        info = []
+        for i in range(0,self.tableWidget.rowCount()):
+            temp = {}
+            temp['shot'] = self.tableWidget.item(i,0).text()
+            temp['StartFrame'] = self.tableWidget.cellWidget(i, 1).value()
+            temp['EndFrame'] = self.tableWidget.cellWidget(i, 2).value()
+            print(type(self.tableWidget.cellWidget(i, 3).currentText()))
+            temp['CharactersActType'] = self.charActTpyeDict.get(self.tableWidget.cellWidget(i, 3).currentText())
+            temp['CharacterMoveSpeed'] = self.charMoveSpeedDict.get(self.tableWidget.cellWidget(i, 4).currentText())
+            focus = []
+            for chbox in self.tableWidget.cellWidget(i, 5).findChildren(QtWidgets.QCheckBox,''):
+                if chbox.checkState():
+                    focus.append(chbox.text())
+            temp['focus'] = focus
+            temp['LensType'] = self.tableWidget.cellWidget(i, 6).currentText()
+            temp['Lensitems'] = self.tableWidget.cellWidget(i, 7).currentText()
+            info.append(temp)
+        print(info)
+        global globalData
+        globalData = info
 
 class Mobu:
     def __init__(self):
         pass
+    def Match_Camera(self,CamName):
+        def creatConstraint(consName):
+            # consName = 'help' will return all constraint name
+            cons = None
+            m = fb.FBConstraintManager()
+            count = m.TypeGetCount()
+            consNameDict = {}
+            for i in range(count):
+                consNameRef = m.TypeGetName(i)
+                consNameDict[consNameRef] = i
+            if consName in consNameDict.keys():
+                cons = m.TypeCreateConstraint(consNameDict[consName])
+            if consName == 'help':
+                cons = consNameDict.keys()
+            return cons
+
+        def AlignTR(pModel, pAlignTo):
+            lAlignTransPos = fb.FBVector3d()
+            lModelTransPos = fb.FBVector3d()
+            lAlignRotPos = fb.FBVector3d()
+            lModelRotPos = fb.FBVector3d()
+            pAlignTo.GetVector(lAlignTransPos)
+            pModel.GetVector(lModelTransPos)
+            pAlignTo.GetVector(lAlignRotPos, fb.FBModelTransformationType.kModelRotation)
+            pModel.GetVector(lModelRotPos, fb.FBModelTransformationType.kModelRotation)
+            pModel.SetVector(lAlignTransPos)
+            pModel.SetVector(lAlignRotPos, fb.FBModelTransformationType.kModelRotation)
+
+        def CreatMarker():
+            Amarker = "Exrig_SourcecameraTR"
+            Bmarker = "Exrig_Roll"
+            Cmarker = "Exrig_TargetcameraTR"
+            Amark = fb.FBModelMarker(Amarker)
+            Amark.Look = fb.FBMarkerLook.kFBMarkerLookNone
+            Amark.Show = False
+            Bmark = fb.FBModelMarker(Bmarker)
+            Bmark.Look = fb.FBMarkerLook.kFBMarkerLookNone
+            Bmark.Show = False
+            Cmark = fb.FBModelMarker(Cmarker)
+            Cmark.Look = fb.FBMarkerLook.kFBMarkerLookNone
+            Cmark.Show = False
+            Bmark.Parent = Amark
+            Cmark.Parent = Bmark
+
+        def FindByNameMobu(name, includeNamespace=True, modelsOnly=True):
+            components = fb.FBComponentList()
+            fb.FBFindObjectsByName(name, components, includeNamespace, modelsOnly)
+            components = list(components)
+            if len(components) == 0:
+                components = None
+            elif len(components) == 1:
+                components = components[0]
+            return components
+
+        def FindAnimationNode(pParent, pName):
+            lResult = None
+            for lNode in pParent.Nodes:
+                if lNode.Name == pName:
+                    lResult = lNode
+                    break
+            return lResult
+
+        def createSourceBox(sourceObj):
+            sourceBox = camrelation.SetAsSource(sourceObj)
+            sourceBox.UseGlobalTransforms = False
+            return sourceBox
+
+        def createTargetBox(targetObj):
+            targetBox = camrelation.ConstrainObject(targetObj)
+            targetBox.UseGlobalTransforms = False
+            return targetBox
+
+        def connectThem(sourceBox, sourceChannel, targetBox, targetChannel):
+            OUT = FindAnimationNode(sourceBox.AnimationNodeOutGet(), sourceChannel)
+            IN = FindAnimationNode(targetBox.AnimationNodeInGet(), targetChannel)
+            fb.FBConnect(OUT, IN)
+
+        # creatmarker and aligntr with sourcecamera
+        CreatMarker()
+        sourcemarker = FindByNameMobu('Exrig_SourcecameraTR')
+        targetmarker = FindByNameMobu('Exrig_TargetcameraTR')
+        sourcecamera = FindByNameMobu(CamName)
+        AlignTR(sourcemarker, sourcecamera)
+        sourceConstraint = creatConstraint('Parent/Child')
+        sourceConstraint.Name = sourcemarker.Name + '-PC-' + sourcecamera.Name
+        sourceConstraint.ReferenceAdd(0, sourcemarker)
+        sourceConstraint.ReferenceAdd(1, sourcecamera)
+        sourceConstraint.Weight = 100
+        sourceConstraint.Active = True
+        sourceConstraint.Snap()
+        # creat camera forrow source
+        ue4cam = fb.FBCamera(sourcecamera.Name)
+        sourcecamera.Name = "Exrig_cam"
+        Firstcamera = FindByNameMobu('Exrig_cam')
+        ue4cam.Show = True
+        ue4cam.UseFrameColor = True
+        ue4cam.ViewShowTimeCode = True
+        ue4cam.ViewShowGrid = True
+        ue4cam.ViewDisplaySafeArea = False
+        ue4cam.ApertureMode = fb.FBCameraApertureMode.kFBApertureHorizontal
+        ue4cam.FilmBackType = fb.FBCameraFilmBackType.kFBFilmBack35mmFullAperture
+        ue4cam.ResolutionMode = fb.FBCameraResolutionMode.kFBResolutionD1PAL
+        ue4cam.PixelAspectRatio = 1.0
+        ue4cam.NearPlaneDistance = 1.0
+        ue4cam.FarPlaneDistance = 4000000000
+        ue4cam.ResolutionHeight = Firstcamera.ResolutionHeight
+        ue4cam.ResolutionWidth = Firstcamera.ResolutionWidth
+        AlignTR(ue4cam, Firstcamera)
+        ue4cam.FieldOfView.SetAnimated(True)
+        # Pc with UEcamera
+        targetcamera = FindByNameMobu(ue4cam.Name)
+        targetConstraint = creatConstraint('Parent/Child')
+        targetConstraint.Name = targetmarker.Name + '-PC-' + targetcamera.Name
+        targetConstraint.ReferenceAdd(0, targetcamera)
+        targetConstraint.ReferenceAdd(1, targetmarker)
+        targetConstraint.Weight = 100
+        targetConstraint.Active = True
+        targetConstraint.Snap()
+        # creat relation to connet source camera
+        camrelation = fb.FBConstraintRelation('Exrig_camrelation')
+        camrelation.Active = True
+        ntvBox = camrelation.CreateFunctionBox('Converters', 'Number to Vector')
+        ntvBox.Name = "Roll_Number to Vector"
+        camrelation.SetBoxPosition(ntvBox, 500, 300)
+        Soucam = createSourceBox(sourcecamera)
+        camrelation.SetBoxPosition(Soucam, 0, 160)
+        Targecam = createTargetBox(targetcamera)
+        camrelation.SetBoxPosition(Targecam, 1400, 160)
+        rollmarker = FindByNameMobu("Exrig_Roll")
+        Targerollmarker = createTargetBox(rollmarker)
+        camrelation.SetBoxPosition(Targerollmarker, 800, 500)
+        connectThem(Soucam, "FieldOfView", Targecam, "FieldOfView")
+        connectThem(Soucam, "Roll", ntvBox, "X")
+        connectThem(ntvBox, "Result", Targerollmarker, "Lcl Rotation")
+        targetcamera.Selected = True
+        if targetcamera:
+            myTake = fb.FBSystem().CurrentTake
+            plotPeriod = fb.FBTime(0, 0, 0, 1)
+            myTake.PlotTakeOnSelected(plotPeriod)
+        foundComponents = fb.FBComponentList()
+        includeNamespace = False
+        modelsOnly = False
+        fb.FBFindObjectsByName('Exrig_*', foundComponents, includeNamespace, modelsOnly)
+        for cleancamera in foundComponents:
+            try:
+                cleancamera.FBDelete()
+            except:
+                pass
+        ue4cam.LongName = ue4cam.Name + ":" + ue4cam.Name
     def bakeClean(self):
         def save():
             # Save options
@@ -173,41 +467,11 @@ class Mobu:
         for select in selectedModels:
             select.Selected = False
         del (selectedModels)
-    def camExport(self,path):
-        pro = path.split('/')[1]
-        ep = path.split('/')[3]
-        sc = path.split('/')[4]
-        seq = path.split('/')[5]
+    def camExport(self,path,name):
         self.UnSelectAll()
-        filePath = '//%s/LocalShare/ueCam/Ue4camera.fbx'%(public_disk.encode('ascii'))
-        takeSource = 'Take Source'
-        takeDest = 'Take 001'
-        options = fb.FBFbxOptions(True, filePath)
         actionDiscard = fb.FBElementAction.kFBElementActionDiscard
-        options.SetAll(actionDiscard, False)
-        options.Cameras = fb.FBElementAction.kFBElementActionMerge
-        options.CamerasAnimation = True
-        options.Constraints = fb.FBElementAction.kFBElementActionMerge
-        options.ConstraintsAnimation = True
-        options.Models = fb.FBElementAction.kFBElementActionMerge
-        options.ModelsAnimation = True
-        # Element options
-        options.BaseCameras = False
-        options.CameraSwitcherSettings = False
-        options.GlobalLightingSettings = False
-        options.CurrentCameraSettings = False
-        options.TransportSettings = False
-        takeCount = options.GetTakeCount()
-        for i in range(takeCount):
-            takeName = options.GetTakeName(i)
-            if takeName == takeSource:
-                options.SetTakeDestinationName(i, takeDest)
-            else:
-                options.SetTakeSelect(i, False)
-        options.ShowOptionsDialog = False
-        fb.FBApplication().FileAppend(filePath, True, options)
         for camera in [c for c in fb.FBSystem().Scene.Cameras if not c.SystemCamera]:
-            if camera.Name == 'UE4_cam':
+            if camera.Name == name.encode('ascii'):
                 camera.Selected = True
         listOfTakes = fb.FBSystem().Scene.Takes
         lFPS = fb.FBTime(0, 0, 0, 1, 0, fb.FBTimeMode().kFBTimeMode25Frames)
@@ -233,10 +497,8 @@ class Mobu:
         soptions.EmbedMedia = False
         # save selected model only
         soptions.SaveSelectedModelsOnly = True
-        camPath = ('%s/%s_%s_%s_%s_shot.fbx'%(path,pro,ep,sc,seq)).encode('ascii')
         fb.FBApplication().FileSave('C:/Users/Public/Documents/temp.fbx', soptions)
-        shutil.copyfile('C:/Users/Public/Documents/temp.fbx',camPath)
-        return [camPath]
+        shutil.copyfile('C:/Users/Public/Documents/temp.fbx',path.encode('ascii'))
     def openFile(self,filePath):
         filePath = filePath.encode('ascii')
         options = fb.FBFbxOptions(True, filePath)
@@ -334,6 +596,7 @@ class Mobu:
             if item.get('json').get('step_code')=='rig' and item.get('json').get('asset_code')==code:
                 return item.get('json').get('Publish_path')
     def xml(self,item,data):
+        global globalData
         self.bakeClean()
         self.openFile('C:/Users/Public/Documents/temp.fbx')
         outPath = item.get('json').get('Publish_path')
@@ -342,7 +605,10 @@ class Mobu:
         sc = outPath.split('/')[4]
         seq = outPath.split('/')[5]
         char = self.exportFile(outPath,pro,ep,sc,seq)
-        cam = self.camExport(outPath)
+        for camera in [c for c in fb.FBSystem().Scene.Cameras if not c.SystemCamera]:
+            name = camera.Name
+            self.Match_Camera(name)
+            self.camExport('%s/%s_%s_%s_%s_%s.fbx'%(outPath,pro,ep,sc,seq,name),name)
         day = str(datetime.datetime.now())
         root = Element('TaskList', {'releaseDate': day})
         tree = ElementTree(root)
@@ -362,17 +628,17 @@ class Mobu:
             SkeletalAnimation = SubElement(Task, 'SkeletalAnimation')
             SkeletalAnimation.set('Path', '%s/%s_%s_%s_%s_%s.fbx'%(outPath,pro,ep,sc,seq,each))
             SkeletalAnimation.set('Reference', '%s/%s_rig_%s.fbx'%(self.findAsset(data,code),code,version))
-        for each in cam:
+        for each in globalData:
             temp = SubElement(Task, 'Camera')
-            temp.set('Path',each)
-            temp.set('StartFrame',str(fb.FBSystem().CurrentTake.LocalTimeSpan.GetStart().GetFrame()))
-            temp.set('EndFrame', str(fb.FBSystem().CurrentTake.LocalTimeSpan.GetStop().GetFrame()))
-            temp.set('CharactersNumber', '1')
-            temp.set('CharactersActType', 'action')
-            temp.set('CharacterMoveSpeed', 'Slow')
-            temp.set('LensType', 'CloseUp')
-            temp.set('LightType', 'PV22_225_045')
-            temp.set('name', 'UE4_cam')
+            temp.set('Path','%s/%s_%s_%s_%s_%s.fbx'%(outPath,pro,ep,sc,seq,each.get('shot')))
+            temp.set('StartFrame',str(each.get('StartFrame')))
+            temp.set('EndFrame', str(each.get('EndFrame')))
+            temp.set('CharactersNumber', str(len(each.get('focus'))))
+            temp.set('CharactersActType', each.get('CharactersActType'))
+            temp.set('CharacterMoveSpeed',each.get('CharacterMoveSpeed'))
+            temp.set('LensType', each.get('focus'))
+            # temp.set('LightType', 'PV22_225_045')
+            temp.set('name', each.get('shot'))
         tree.write(outPath + '/Description.xml', encoding='utf-8', xml_declaration=True)
     def backUp(self,path):
         if os.path.exists(path):
@@ -384,7 +650,6 @@ class Mobu:
 class UE:
     def __init__(self):
         pass
-
     def executeImportTasks(self,tasks):
         unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
         return [task.get_editor_property('imported_object_paths') for task in tasks]
@@ -508,6 +773,9 @@ class Thread(QThread):
         super(Thread,self).__init__()
     def run(self):
         self.fun()
+def threadWrap(fun):
+    thread = Thread(fun)
+    thread.start()
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
@@ -795,15 +1063,27 @@ class Ui_MainWindow(object):
         self.tabWidget = QtWidgets.QTabWidget(self.tab)
         self.tabWidget.setGeometry(QtCore.QRect(0, 0, 271, 510))
         self.tabWidget.setObjectName("tabWidget")
+        self.texture_tab = QtWidgets.QWidget()
+        self.texture_tab.setObjectName("texture_tab")
+        self.matEditBtn = QtWidgets.QCommandLinkButton(self.texture_tab)
+        self.matEditBtn.setGeometry(QtCore.QRect(10, 20, 151, 41))
+        self.matEditBtn.setObjectName("matEditBtn")
+        self.tabWidget.addTab(self.texture_tab, "")
         self.layout_tab = QtWidgets.QWidget()
         self.layout_tab.setObjectName("layout_tab")
         self.tabWidget.addTab(self.layout_tab, "")
         self.anim_tab = QtWidgets.QWidget()
         self.anim_tab.setObjectName("anim_tab")
         self.tabWidget.addTab(self.anim_tab, "")
+        self.server_tab = QtWidgets.QWidget()
+        self.server_tab.setObjectName("server_tab")
+        self.LinkServerBtn = QtWidgets.QCommandLinkButton(self.server_tab)
+        self.LinkServerBtn.setGeometry(QtCore.QRect(20, 20, 151, 41))
+        self.LinkServerBtn.setObjectName("LinkServerBtn")
+        self.tabWidget.addTab(self.server_tab, "")
         self.progressBar = QtWidgets.QProgressBar(self.tab)
         self.progressBar.setGeometry(QtCore.QRect(0, 508, 268, 20))
-        self.progressBar.setProperty("value", 0)
+        self.progressBar.setProperty("value", 1)
         self.progressBar.setTextVisible(False)
         self.progressBar.setObjectName("progressBar")
         self.dealWidget.addTab(self.tab, "")
@@ -826,9 +1106,9 @@ class Ui_MainWindow(object):
         self.actiontest_2.setObjectName("actiontest_2")
 
         self.retranslateUi(MainWindow)
-        self.module_tab.setCurrentIndex(2)
+        self.module_tab.setCurrentIndex(0)
         self.dealWidget.setCurrentIndex(3)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(3)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -923,8 +1203,12 @@ class Ui_MainWindow(object):
         self.dealWidget.setTabText(self.dealWidget.indexOf(self.filter_tab), QtWidgets.QApplication.translate("MainWindow", "我的任务", None, -1))
         self.dealWidget.setTabText(self.dealWidget.indexOf(self.work_tab), QtWidgets.QApplication.translate("MainWindow", "work", None, -1))
         self.dealWidget.setTabText(self.dealWidget.indexOf(self.pubilsh_tab), QtWidgets.QApplication.translate("MainWindow", "pubilsh", None, -1))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.layout_tab), QtWidgets.QApplication.translate("MainWindow", "layout", None, -1))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.anim_tab), QtWidgets.QApplication.translate("MainWindow", "anim", None, -1))
+        self.matEditBtn.setText(QtWidgets.QApplication.translate("MainWindow", "材质模板编辑器", None, -1))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.texture_tab), QtWidgets.QApplication.translate("MainWindow", "贴图", None, -1))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.layout_tab), QtWidgets.QApplication.translate("MainWindow", "Layout", None, -1))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.anim_tab), QtWidgets.QApplication.translate("MainWindow", "动画", None, -1))
+        self.LinkServerBtn.setText(QtWidgets.QApplication.translate("MainWindow", "打开服务端", None, -1))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.server_tab), QtWidgets.QApplication.translate("MainWindow", "服务端", None, -1))
         self.dealWidget.setTabText(self.dealWidget.indexOf(self.tab), QtWidgets.QApplication.translate("MainWindow", "流程功能", None, -1))
         self.actionopen.setText(QtWidgets.QApplication.translate("MainWindow", "temp", None, -1))
         self.actiontemp.setText(QtWidgets.QApplication.translate("MainWindow", "打开", None, -1))
@@ -970,7 +1254,98 @@ class strack():
             return task.get('rows')
         else:
             return []
+class matWidget(QtWidgets.QMainWindow):
+    def __init__(self):
+        QtWidgets.QMainWindow.__init__(self)
+        self.setupUi(self)
+        self.refesh_treeWidget()
+        self.refesh_listWidget()
+        self.pushButton.clicked.connect(self.convert)
+        self.mat_listWidget.itemClicked.connect(self.selectMesh)
+    def setupUi(self, Form):
+        Form.setObjectName("Form")
+        Form.resize(843, 571)
+        self.mat_listWidget = QtWidgets.QListWidget(Form)
+        self.mat_listWidget.setGeometry(QtCore.QRect(10, 10, 311, 420))
+        font = QtGui.QFont()
+        font.setPointSize(15)
+        self.mat_listWidget.setFont(font)
+        self.mat_listWidget.setObjectName("mat_listWidget")
+        self.treeWidget = QtWidgets.QTreeWidget(Form)
+        self.treeWidget.setGeometry(QtCore.QRect(328, 10, 511, 420))
+        self.treeWidget.setObjectName("treeWidget")
+        self.pushButton = QtWidgets.QPushButton(Form)
+        self.pushButton.setGeometry(QtCore.QRect(330, 490, 121, 51))
+        font = QtGui.QFont()
+        font.setPointSize(18)
+        self.pushButton.setFont(font)
+        self.pushButton.setObjectName("pushButton")
 
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
+    def retranslateUi(self, Form):
+        Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
+        self.treeWidget.headerItem().setText(0, QtWidgets.QApplication.translate("Form", "id", None, -1))
+        self.treeWidget.headerItem().setText(1, QtWidgets.QApplication.translate("Form", "微缩图", None, -1))
+        self.treeWidget.headerItem().setText(2, QtWidgets.QApplication.translate("Form", "名称", None, -1))
+        self.treeWidget.headerItem().setText(3, QtWidgets.QApplication.translate("Form", "编码", None, -1))
+        self.treeWidget.headerItem().setText(4, QtWidgets.QApplication.translate("Form", "简述", None, -1))
+        self.pushButton.setText(QtWidgets.QApplication.translate("Form", "转化", None, -1))
+    def set_meshname(self,mat):
+        if mc.listConnections(mc.listConnections(mat, type='shadingEngine'), type='mesh'):
+            mesh_list = mc.listConnections(mc.listConnections(mat, type='shadingEngine'), type='mesh')
+            for i in range(0, len(mesh_list)):
+                if mc.objExists(mesh_list[i]):
+                    mc.select(mesh_list[i])
+                    mc.rename(mat + '_mesh' + str(i))
+    def selectMesh(self):
+        mat = self.mat_listWidget.selectedItems()[0].text()
+        mesh_list = mc.listConnections(mc.listConnections(mat, type='shadingEngine'), type='mesh')
+        if mesh_list:
+            mc.select(mesh_list)
+
+    def renameMat(self,mat,matTemp):
+        filename = mc.file(q=1, sn=1, shortName=1).split('.')[0].split('_')[0]
+        mc.select(mat)
+        if mc.objExists(filename + '_part_' + matTemp):
+            mc.select(filename +'_*_' + matTemp)
+            newname = filename + '_part' + str(len(mc.ls(sl=1))) + '_' + matTemp
+        else:
+            newname = filename + '_part_' + matTemp
+        mc.rename(newname)
+        try:
+            mc.rename(mc.listConnections(mc.ls(sl=1)[0], type='shadingEngine')[0], str(mc.ls(sl=1)[0]) + 'SG')
+        except:
+            pass
+        return newname
+    def refesh_listWidget(self):
+        self.mat_listWidget.clear()
+        mat = mc.ls(type='blinn')
+        mat += mc.ls(type='lambert')
+        mat += mc.ls(type='phong')
+        for item in mat:
+            temp = QtWidgets.QListWidgetItem()
+            temp.setText(item)
+            self.mat_listWidget.addItem(temp)
+    def refesh_treeWidget(self):
+        r_json = requests.get('http://%s:5000/uemat/json'%node_server)
+        r_json = json.loads(r_json.content)
+        self.treeWidget.setIconSize(QtCore.QSize(80, 80))
+        self.treeWidget.hideColumn(0)
+        for item in r_json:
+            icon = QPixmap()
+            icon.loadFromData(base64.b64decode(item.get('img64').split(',')[1]))
+            child = QtWidgets.QTreeWidgetItem(self.treeWidget)
+            child.setIcon(1,QIcon(icon))
+            child.setText(2, item.get('matCn'))
+            child.setText(3, item.get('matCode'))
+            child.setText(4, item.get('matResume'))
+    def convert(self):
+        if self.mat_listWidget.selectedItems() and self.treeWidget.selectedItems():
+            mat = self.mat_listWidget.selectedItems()[0].text()
+            matTemp = self.treeWidget.selectedItems()[0].text(3)
+            newname = self.renameMat(mat,matTemp)
+            self.mat_listWidget.selectedItems()[0].setText(newname)
 class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
     def __init__(self,myStrack,local_path):
         self.taskServer = node_server
@@ -982,6 +1357,7 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.setupUi(self)
         self.setIcon()
         self.set_style()
+        self.refeshShotTreeLock = False
         self.close_button.clicked.connect(self.close)
         self.min_button.clicked.connect(self.showMinimized)
         self.asset_treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -1001,7 +1377,6 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.asset_type_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_step_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_status_selector.currentIndexChanged.connect(self.refeshAssetTree)
-        self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_episode_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_session_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotEpisode)
@@ -1024,6 +1399,8 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.refesh_button.clicked.connect(self.refeshData)
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
+        self.matEditBtn.clicked.connect(self.mat_win)
+        self.LinkServerBtn.clicked.connect(self.server_win)
         self.worker = ''
         self.cirInit()
         self.Qpix = QtGui.QPixmap(201, 201)
@@ -1052,13 +1429,13 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.lineWidth = 10
         self.timeLine = QtCore.QTimeLine(1000, self)
         self.timeLine.frameChanged.connect(self.updateTimeline)
-        self.setAngle()
+        self.setAngle(100)
     def updateTimeline(self, frame):
         self.drawAngle = frame
         self.update()
-    def setAngle(self):
+    def setAngle(self,value):
         self.drawAngle = self.angle
-        self.angle = 100
+        self.angle = value
         self.timeLine.stop()
         self.timeLine.setFrameRange(self.drawAngle, self.angle)
         # self.update()
@@ -1075,7 +1452,7 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         painter.restore()
         painter.setPen(QtGui.QColor(QtCore.Qt.white))
         painter.setFont(QtGui.QFont('Times New Roman', 45))
-        painter.drawText(50, 120, "30%")
+        painter.drawText(55, 120, str(int(self.angle/3.6)) + "%")
         painter.restore()
         painter.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform, on=True)
         the_path = QtGui.QPainterPath()
@@ -1111,16 +1488,19 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         else:
             return True
     def refeshShotEpisode(self):
+        self.refeshShotTreeLock = True
         self.shot_episode_selector.clear()
-        self.shot_episode_selector.addItem(u'集数')
+        self.shot_episode_selector.addItem(u' 集 数')
         projCode = self.shot_proj_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0:
             for item in self.episode_data:
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id'):
                     self.shot_episode_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshShotSession(self):
+        self.refeshShotTreeLock = True
         self.shot_session_selector.clear()
-        self.shot_session_selector.addItem(u'场次')
+        self.shot_session_selector.addItem(u' 场 次')
         projCode = self.shot_proj_selector.currentText()
         episodeCode = self.shot_episode_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0 and self.shot_episode_selector.currentIndex()>0:
@@ -1128,6 +1508,7 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id') \
                         and item.get('parent_id')== self.findEpisode(episodeCode,item.get('project_id')).get('id'):
                     self.shot_session_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshData(self):
         self.asset_data = self.strack.asset_task()
         self.shot_data = self.strack.shot_task()
@@ -1248,7 +1629,7 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.asset_proj_selector.currentText()
         if self.asset_status_selector.currentIndex():
             status = self.asset_status_selector.currentText()
-        for item in self.asset_data:
+        for i,item in enumerate(self.asset_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data,item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('asset_code')) or re.search(word,item.get('json').get('asset_name')))\
@@ -1272,56 +1653,59 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('asset_type_name'))
                     child.setText(8, item.get('json').get('project_name'))
-
+                    if i%15==0:
+                        QtWidgets.QApplication.processEvents()
     def refeshShotTree(self):
-        word = self.ShotSearchText.text()
-        self.shot_treeWidget.clear()
-        self.shot_treeWidget.hideColumn(0)
-        self.shot_treeWidget.setColumnWidth(1, 80)
-        self.shot_treeWidget.setColumnWidth(2, 60)
-        self.shot_treeWidget.setColumnWidth(3, 60)
-        self.shot_treeWidget.setColumnWidth(4, 60)
-        self.shot_treeWidget.setColumnWidth(5, 100)
-        self.shot_treeWidget.setColumnWidth(6, 60)
-        self.shot_treeWidget.setColumnWidth(7, 50)
-        proj, step,episode,session,status= '', '', '','',''
-        if self.shot_step_selector.currentIndex():
-            step = self.shot_step_selector.currentText()
-        if self.shot_proj_selector.currentIndex():
-            proj = self.shot_proj_selector.currentText()
-        if self.shot_episode_selector.currentIndex():
-            episode = self.shot_episode_selector.currentText()
-        if self.shot_session_selector.currentIndex():
-            session = self.shot_session_selector.currentText()
-        if self.shot_status_selector.currentIndex():
-            status = self.shot_status_selector.currentText()
-        for item in self.shot_data:
-            if item.get('json'):
-                status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
-                if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
-                        and re.search(step, item.get('json').get('step_code')) \
-                        and re.search(proj, item.get('json').get('project_code')) \
-                        and re.search(episode, item.get('json').get('episode_code')) \
-                        and re.search(session, item.get('json').get('session_code')) \
-                        and re.search(status, status_name) \
-                        and self.deadlineCheck(item) \
-                        and self.excoutorCheck(item):
-                    child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
-                    child.setText(0, str(item.get('id')))
-                    child.setText(1, status_name)
-                    child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
-                                     self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
-                    child.setText(2, item.get('json').get('episode_name'))
-                    child.setText(3, item.get('json').get('session_name'))
-                    child.setText(4, item.get('json').get('sequence_name'))
-                    child.setText(5, item.get('json').get('task_name'))
-                    if item.get('executor'):
-                        child.setText(6, item.get('executor')[0].get('name'))
-                    child.setText(7, item.get('duration'))
-                    child.setText(8, item.get('start_time'))
-                    child.setText(9, item.get('end_time'))
-                    child.setText(10, item.get('json').get('project_name'))
-
+        if not self.refeshShotTreeLock:
+            word = self.ShotSearchText.text()
+            self.shot_treeWidget.clear()
+            self.shot_treeWidget.hideColumn(0)
+            self.shot_treeWidget.setColumnWidth(1, 80)
+            self.shot_treeWidget.setColumnWidth(2, 60)
+            self.shot_treeWidget.setColumnWidth(3, 60)
+            self.shot_treeWidget.setColumnWidth(4, 60)
+            self.shot_treeWidget.setColumnWidth(5, 100)
+            self.shot_treeWidget.setColumnWidth(6, 60)
+            self.shot_treeWidget.setColumnWidth(7, 50)
+            proj, step,episode,session,status= '', '', '','',''
+            if self.shot_step_selector.currentIndex():
+                step = self.shot_step_selector.currentText()
+            if self.shot_proj_selector.currentIndex():
+                proj = self.shot_proj_selector.currentText()
+            if self.shot_episode_selector.currentIndex():
+                episode = self.shot_episode_selector.currentText()
+            if self.shot_session_selector.currentIndex():
+                session = self.shot_session_selector.currentText()
+            if self.shot_status_selector.currentIndex():
+                status = self.shot_status_selector.currentText()
+            for i,item in enumerate(self.shot_data):
+                if item.get('json'):
+                    status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
+                    if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
+                            and re.search(step, item.get('json').get('step_code')) \
+                            and re.search(proj, item.get('json').get('project_code')) \
+                            and re.search(episode, item.get('json').get('episode_code')) \
+                            and re.search(session, item.get('json').get('session_code')) \
+                            and re.search(status, status_name) \
+                            and self.deadlineCheck(item) \
+                            and self.excoutorCheck(item):
+                        child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
+                        child.setText(0, str(item.get('id')))
+                        child.setText(1, status_name)
+                        child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
+                                         self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
+                        child.setText(2, item.get('json').get('episode_name'))
+                        child.setText(3, item.get('json').get('session_name'))
+                        child.setText(4, item.get('json').get('sequence_name'))
+                        child.setText(5, item.get('json').get('task_name'))
+                        if item.get('executor'):
+                            child.setText(6, item.get('executor')[0].get('name'))
+                        child.setText(7, item.get('duration'))
+                        child.setText(8, item.get('start_time'))
+                        child.setText(9, item.get('end_time'))
+                        child.setText(10, item.get('json').get('project_name'))
+                        if i%15==0:
+                            QtWidgets.QApplication.processEvents()
     def refeshLevelTree(self):
         word = self.LevelSearchText.text()
         self.level_treeWidget.clear()
@@ -1337,7 +1721,7 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.level_proj_selector.currentText()
         if self.level_status_selector.currentIndex():
             status = self.level_status_selector.currentText()
-        for item in self.level_data:
+        for i,item in enumerate(self.level_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('level_code')) or re.search(word,item.get('json').get('level_name')))\
@@ -1359,6 +1743,8 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(5, item.get('start_time'))
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('project_name'))
+                    if i%10==0:
+                        QtWidgets.QApplication.processEvents()
 
     def assetOpenMenu(self,position):
         menu = QtWidgets.QMenu()
@@ -1662,7 +2048,15 @@ class mayaWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.min_button.setIcon(QtGui.QIcon(QtGui.QPixmap('%s/images/13.jpg' % self.local_path)))
         self.setStyleSheet('QMainWindow{border-image :url(%s/images/11.jpg);}' % self.local_path)
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-
+    def mat_win(self):
+        self.matWin = matWidget()
+        self.matWin.show()
+        self.matWin.setFixedSize(843, 571)
+    def server_win(self):
+        self.serverWin = QWebEngineView()
+        self.serverWin.load(QUrl("http://%s:5000"%node_server))
+        self.serverWin.show()
+        self.serverWin.setFixedSize(1400, 750)
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             self.m_drag = True
@@ -1715,6 +2109,7 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.setupUi(self)
         self.setIcon()
         self.set_style()
+        self.refeshShotTreeLock = False
         self.close_button.clicked.connect(self.close)
         self.min_button.clicked.connect(self.showMinimized)
         self.asset_treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -1734,7 +2129,6 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.asset_type_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_step_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_status_selector.currentIndexChanged.connect(self.refeshAssetTree)
-        self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_episode_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_session_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotEpisode)
@@ -1757,6 +2151,7 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.refesh_button.clicked.connect(self.refeshData)
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
+        self.LinkServerBtn.clicked.connect(self.server_win)
         self.worker = ''
         self.cirInit()
         self.Qpix = QtGui.QPixmap(201, 201)
@@ -1879,16 +2274,19 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                 break
         return temp
     def refeshShotEpisode(self):
+        self.refeshShotTreeLock = True
         self.shot_episode_selector.clear()
-        self.shot_episode_selector.addItem(u'集数')
+        self.shot_episode_selector.addItem(u' 集 数')
         projCode = self.shot_proj_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0:
             for item in self.episode_data:
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id'):
                     self.shot_episode_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshShotSession(self):
+        self.refeshShotTreeLock = True
         self.shot_session_selector.clear()
-        self.shot_session_selector.addItem(u'场次')
+        self.shot_session_selector.addItem(u' 场 次')
         projCode = self.shot_proj_selector.currentText()
         episodeCode = self.shot_episode_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0 and self.shot_episode_selector.currentIndex()>0:
@@ -1896,6 +2294,7 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id') \
                         and item.get('parent_id')== self.findEpisode(episodeCode,item.get('project_id')).get('id'):
                     self.shot_session_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshData(self):
         self.asset_data = self.strack.asset_task()
         self.shot_data = self.strack.shot_task()
@@ -1994,7 +2393,7 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.asset_proj_selector.currentText()
         if self.asset_status_selector.currentIndex():
             status = self.asset_status_selector.currentText()
-        for item in self.asset_data:
+        for i,item in enumerate(self.asset_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data,item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('asset_code')) or re.search(word,item.get('json').get('asset_name')))\
@@ -2018,56 +2417,59 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('asset_type_name'))
                     child.setText(8, item.get('json').get('project_name'))
-
+                    if i%15==0:
+                        QtWidgets.QApplication.processEvents()
     def refeshShotTree(self):
-        word = self.ShotSearchText.text()
-        self.shot_treeWidget.clear()
-        self.shot_treeWidget.hideColumn(0)
-        self.shot_treeWidget.setColumnWidth(1, 80)
-        self.shot_treeWidget.setColumnWidth(2, 60)
-        self.shot_treeWidget.setColumnWidth(3, 60)
-        self.shot_treeWidget.setColumnWidth(4, 60)
-        self.shot_treeWidget.setColumnWidth(5, 100)
-        self.shot_treeWidget.setColumnWidth(6, 60)
-        self.shot_treeWidget.setColumnWidth(7, 50)
-        proj, step,episode,session,status= '', '', '','',''
-        if self.shot_step_selector.currentIndex():
-            step = self.shot_step_selector.currentText()
-        if self.shot_proj_selector.currentIndex():
-            proj = self.shot_proj_selector.currentText()
-        if self.shot_episode_selector.currentIndex():
-            episode = self.shot_episode_selector.currentText()
-        if self.shot_session_selector.currentIndex():
-            session = self.shot_session_selector.currentText()
-        if self.shot_status_selector.currentIndex():
-            status = self.shot_status_selector.currentText()
-        for item in self.shot_data:
-            if item.get('json'):
-                status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
-                if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
-                        and re.search(step, item.get('json').get('step_code')) \
-                        and re.search(proj, item.get('json').get('project_code')) \
-                        and re.search(episode, item.get('json').get('episode_code')) \
-                        and re.search(session, item.get('json').get('session_code')) \
-                        and re.search(status, status_name) \
-                        and self.deadlineCheck(item) \
-                        and self.excoutorCheck(item):
-                    child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
-                    child.setText(0, str(item.get('id')))
-                    child.setText(1, status_name)
-                    child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
-                                     self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
-                    child.setText(2, item.get('json').get('episode_name'))
-                    child.setText(3, item.get('json').get('session_name'))
-                    child.setText(4, item.get('json').get('sequence_name'))
-                    child.setText(5, item.get('json').get('task_name'))
-                    if item.get('executor'):
-                        child.setText(6, item.get('executor')[0].get('name'))
-                    child.setText(7, item.get('duration'))
-                    child.setText(8, item.get('start_time'))
-                    child.setText(9, item.get('end_time'))
-                    child.setText(10, item.get('json').get('project_name'))
-
+        if not self.refeshShotTreeLock:
+            word = self.ShotSearchText.text()
+            self.shot_treeWidget.clear()
+            self.shot_treeWidget.hideColumn(0)
+            self.shot_treeWidget.setColumnWidth(1, 80)
+            self.shot_treeWidget.setColumnWidth(2, 60)
+            self.shot_treeWidget.setColumnWidth(3, 60)
+            self.shot_treeWidget.setColumnWidth(4, 60)
+            self.shot_treeWidget.setColumnWidth(5, 100)
+            self.shot_treeWidget.setColumnWidth(6, 60)
+            self.shot_treeWidget.setColumnWidth(7, 50)
+            proj, step,episode,session,status= '', '', '','',''
+            if self.shot_step_selector.currentIndex():
+                step = self.shot_step_selector.currentText()
+            if self.shot_proj_selector.currentIndex():
+                proj = self.shot_proj_selector.currentText()
+            if self.shot_episode_selector.currentIndex():
+                episode = self.shot_episode_selector.currentText()
+            if self.shot_session_selector.currentIndex():
+                session = self.shot_session_selector.currentText()
+            if self.shot_status_selector.currentIndex():
+                status = self.shot_status_selector.currentText()
+            for i,item in enumerate(self.shot_data):
+                if item.get('json'):
+                    status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
+                    if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
+                            and re.search(step, item.get('json').get('step_code')) \
+                            and re.search(proj, item.get('json').get('project_code')) \
+                            and re.search(episode, item.get('json').get('episode_code')) \
+                            and re.search(session, item.get('json').get('session_code')) \
+                            and re.search(status, status_name) \
+                            and self.deadlineCheck(item) \
+                            and self.excoutorCheck(item):
+                        child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
+                        child.setText(0, str(item.get('id')))
+                        child.setText(1, status_name)
+                        child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
+                                         self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
+                        child.setText(2, item.get('json').get('episode_name'))
+                        child.setText(3, item.get('json').get('session_name'))
+                        child.setText(4, item.get('json').get('sequence_name'))
+                        child.setText(5, item.get('json').get('task_name'))
+                        if item.get('executor'):
+                            child.setText(6, item.get('executor')[0].get('name'))
+                        child.setText(7, item.get('duration'))
+                        child.setText(8, item.get('start_time'))
+                        child.setText(9, item.get('end_time'))
+                        child.setText(10, item.get('json').get('project_name'))
+                        if i%15==0:
+                            QtWidgets.QApplication.processEvents()
     def refeshLevelTree(self):
         word = self.LevelSearchText.text()
         self.level_treeWidget.clear()
@@ -2083,7 +2485,7 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.level_proj_selector.currentText()
         if self.level_status_selector.currentIndex():
             status = self.level_status_selector.currentText()
-        for item in self.level_data:
+        for i,item in enumerate(self.level_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('level_code')) or re.search(word,item.get('json').get('level_name')))\
@@ -2105,6 +2507,8 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(5, item.get('start_time'))
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('project_name'))
+                    if i%10==0:
+                        QtWidgets.QApplication.processEvents()
 
     def assetOpenMenu(self,position):
         menu = QtWidgets.QMenu()
@@ -2151,7 +2555,11 @@ class mobuWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                         'module_id': 58
                     }
                     self.strack.st.create('sequence',data)
-
+    def server_win(self):
+        self.serverWin = QWebEngineView()
+        self.serverWin.load(QUrl("http://%s:5000"%node_server))
+        self.serverWin.show()
+        self.serverWin.setFixedSize(1400, 750)
     def levelOpenMenu(self,position):
         menu = QtWidgets.QMenu()
         importAction = menu.addAction("导入")
@@ -2417,6 +2825,7 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.setupUi(self)
         self.setIcon()
         self.set_style()
+        self.refeshShotTreeLock = False
         self.close_button.clicked.connect(self.close)
         self.min_button.clicked.connect(self.showMinimized)
         self.asset_treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -2436,11 +2845,9 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.asset_type_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_step_selector.currentIndexChanged.connect(self.refeshAssetTree)
         self.asset_status_selector.currentIndexChanged.connect(self.refeshAssetTree)
-        self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_episode_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_session_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotEpisode)
-        self.shot_proj_selector.currentIndexChanged.connect(self.refeshShotSession)
         self.shot_episode_selector.currentIndexChanged.connect(self.refeshShotSession)
         self.shot_step_selector.currentIndexChanged.connect(self.refeshShotTree)
         self.shot_status_selector.currentIndexChanged.connect(self.refeshShotTree)
@@ -2459,8 +2866,10 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
         self.refesh_button.clicked.connect(self.refeshData)
         self.myTaskBtn.clicked.connect(self.myTask)
         self.allTaskBtn.clicked.connect(self.allTask)
+        self.LinkServerBtn.clicked.connect(self.server_win)
         self.worker = ''
         self.dataInit()
+
     def dataInit(self):
         cacheFile = '//%s/LocalShare/teamones/cache.json'%public_disk
         if os.path.exists(cacheFile):
@@ -2496,18 +2905,20 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     return False
         else:
             return True
-
     def refeshShotEpisode(self):
+        self.refeshShotTreeLock = True
         self.shot_episode_selector.clear()
-        self.shot_episode_selector.addItem(u'集数')
+        self.shot_episode_selector.addItem(u' 集 数')
         projCode = self.shot_proj_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0:
             for item in self.episode_data:
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id'):
                     self.shot_episode_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshShotSession(self):
+        self.refeshShotTreeLock = True
         self.shot_session_selector.clear()
-        self.shot_session_selector.addItem(u'场次')
+        self.shot_session_selector.addItem(u' 场 次')
         projCode = self.shot_proj_selector.currentText()
         episodeCode = self.shot_episode_selector.currentText()
         if self.shot_proj_selector.currentIndex()>0 and self.shot_episode_selector.currentIndex()>0:
@@ -2515,6 +2926,7 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                 if item.get('project_id') == self.projCodeToItem(projCode).get('id') \
                         and item.get('parent_id')== self.findEpisode(episodeCode,item.get('project_id')).get('id'):
                     self.shot_session_selector.addItem(item.get('code'))
+        self.refeshShotTreeLock = False
     def refeshData(self):
         self.asset_data = self.strack.asset_task()
         self.shot_data = self.strack.shot_task()
@@ -2644,7 +3056,7 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.asset_proj_selector.currentText()
         if self.asset_status_selector.currentIndex():
             status = self.asset_status_selector.currentText()
-        for item in self.asset_data:
+        for i,item in enumerate(self.asset_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data,item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('asset_code')) or re.search(word,item.get('json').get('asset_name')))\
@@ -2668,56 +3080,59 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('asset_type_name'))
                     child.setText(8, item.get('json').get('project_name'))
-
+                    if i%15==0:
+                        QtWidgets.QApplication.processEvents()
     def refeshShotTree(self):
-        word = self.ShotSearchText.text()
-        self.shot_treeWidget.clear()
-        self.shot_treeWidget.hideColumn(0)
-        self.shot_treeWidget.setColumnWidth(1, 80)
-        self.shot_treeWidget.setColumnWidth(2, 60)
-        self.shot_treeWidget.setColumnWidth(3, 60)
-        self.shot_treeWidget.setColumnWidth(4, 60)
-        self.shot_treeWidget.setColumnWidth(5, 100)
-        self.shot_treeWidget.setColumnWidth(6, 60)
-        self.shot_treeWidget.setColumnWidth(7, 50)
-        proj, step,episode,session,status= '', '', '','',''
-        if self.shot_step_selector.currentIndex():
-            step = self.shot_step_selector.currentText()
-        if self.shot_proj_selector.currentIndex():
-            proj = self.shot_proj_selector.currentText()
-        if self.shot_episode_selector.currentIndex():
-            episode = self.shot_episode_selector.currentText()
-        if self.shot_session_selector.currentIndex():
-            session = self.shot_session_selector.currentText()
-        if self.shot_status_selector.currentIndex():
-            status = self.shot_status_selector.currentText()
-        for item in self.shot_data:
-            if item.get('json'):
-                status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
-                if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
-                        and re.search(step, item.get('json').get('step_code')) \
-                        and re.search(proj, item.get('json').get('project_code')) \
-                        and re.search(episode, item.get('json').get('episode_code')) \
-                        and re.search(session, item.get('json').get('session_code')) \
-                        and re.search(status, status_name) \
-                        and self.deadlineCheck(item) \
-                        and self.excoutorCheck(item):
-                    child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
-                    child.setText(0, str(item.get('id')))
-                    child.setText(1, status_name)
-                    child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
-                                     self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
-                    child.setText(2, item.get('json').get('episode_name'))
-                    child.setText(3, item.get('json').get('session_name'))
-                    child.setText(4, item.get('json').get('sequence_name'))
-                    child.setText(5, item.get('json').get('task_name'))
-                    if item.get('executor'):
-                        child.setText(6, item.get('executor')[0].get('name'))
-                    child.setText(7, item.get('duration'))
-                    child.setText(8, item.get('start_time'))
-                    child.setText(9, item.get('end_time'))
-                    child.setText(10, item.get('json').get('project_name'))
-
+        if not self.refeshShotTreeLock:
+            word = self.ShotSearchText.text()
+            self.shot_treeWidget.clear()
+            self.shot_treeWidget.hideColumn(0)
+            self.shot_treeWidget.setColumnWidth(1, 80)
+            self.shot_treeWidget.setColumnWidth(2, 60)
+            self.shot_treeWidget.setColumnWidth(3, 60)
+            self.shot_treeWidget.setColumnWidth(4, 60)
+            self.shot_treeWidget.setColumnWidth(5, 100)
+            self.shot_treeWidget.setColumnWidth(6, 60)
+            self.shot_treeWidget.setColumnWidth(7, 50)
+            proj, step,episode,session,status= '', '', '','',''
+            if self.shot_step_selector.currentIndex():
+                step = self.shot_step_selector.currentText()
+            if self.shot_proj_selector.currentIndex():
+                proj = self.shot_proj_selector.currentText()
+            if self.shot_episode_selector.currentIndex():
+                episode = self.shot_episode_selector.currentText()
+            if self.shot_session_selector.currentIndex():
+                session = self.shot_session_selector.currentText()
+            if self.shot_status_selector.currentIndex():
+                status = self.shot_status_selector.currentText()
+            for i,item in enumerate(self.shot_data):
+                if item.get('json'):
+                    status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
+                    if (re.search(word,item.get('json').get('sequence_name')) or re.search(word,item.get('json').get('sequence_code'))) \
+                            and re.search(step, item.get('json').get('step_code')) \
+                            and re.search(proj, item.get('json').get('project_code')) \
+                            and re.search(episode, item.get('json').get('episode_code')) \
+                            and re.search(session, item.get('json').get('session_code')) \
+                            and re.search(status, status_name) \
+                            and self.deadlineCheck(item) \
+                            and self.excoutorCheck(item):
+                        child = QtWidgets.QTreeWidgetItem(self.shot_treeWidget)
+                        child.setText(0, str(item.get('id')))
+                        child.setText(1, status_name)
+                        child.setIcon(1, QtGui.QIcon('%s/images/%s'%(self.local_path,
+                                         self.strack.exrStatusIcon.get(item.get('json').get('exrStatus','work')))))
+                        child.setText(2, item.get('json').get('episode_name'))
+                        child.setText(3, item.get('json').get('session_name'))
+                        child.setText(4, item.get('json').get('sequence_name'))
+                        child.setText(5, item.get('json').get('task_name'))
+                        if item.get('executor'):
+                            child.setText(6, item.get('executor')[0].get('name'))
+                        child.setText(7, item.get('duration'))
+                        child.setText(8, item.get('start_time'))
+                        child.setText(9, item.get('end_time'))
+                        child.setText(10, item.get('json').get('project_name'))
+                        if i%15==0:
+                            QtWidgets.QApplication.processEvents()
     def refeshLevelTree(self):
         word = self.LevelSearchText.text()
         self.level_treeWidget.clear()
@@ -2733,7 +3148,7 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             proj = self.level_proj_selector.currentText()
         if self.level_status_selector.currentIndex():
             status = self.level_status_selector.currentText()
-        for item in self.level_data:
+        for i,item in enumerate(self.level_data):
             if item.get('json'):
                 status_name = self.dataIdSelect(self.status_data, item.get('status_id')).get('name')
                 if (re.search(word,item.get('json').get('level_code')) or re.search(word,item.get('json').get('level_name')))\
@@ -2755,19 +3170,21 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
                     child.setText(5, item.get('start_time'))
                     child.setText(6, item.get('end_time'))
                     child.setText(7, item.get('json').get('project_name'))
-
+                    if i%10==0:
+                        QtWidgets.QApplication.processEvents()
     def assetOpenMenu(self,position):
         menu = QtWidgets.QMenu()
-        importAction = menu.addAction("导入")
-        updateAction = menu.addAction("更新")
+        importAction = menu.addAction("导入/更新")
         action = menu.exec_(self.asset_treeWidget.mapToGlobal(position))
         if action == importAction:
             if self.asset_treeWidget.selectedItems():
-                print(self.asset_treeWidget.selectedItems()[0].text(1))
-        if action == updateAction:
-            if self.asset_treeWidget.selectedItems():
+                print('here')
                 id = self.asset_treeWidget.selectedItems()[0].text(0)
-                print(self.dataIdSelect(self.asset_data, id))
+                item = self.dataIdSelect(self.asset_data, id)
+                step = item.get('json').get('step_code')
+                if step == 'texture':
+                    import_task = StaticTextureMeshTask()
+                    import_task.importAsset(item.get('json').get('Publish_path'))
 
     def shotOpenMenu(self,position):
         menu = QtWidgets.QMenu()
@@ -2780,7 +3197,6 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             if action == importAction:
                 id = self.shot_treeWidget.selectedItems()[0].text(0)
                 item = self.dataIdSelect(self.shot_data, id)
-                print(item)
                 if item.get('json').get('step_code') == 'lighting':
                     workPath = item.get('json').get('Work_path')
                     PublishPath = item.get('json').get('Publish_path')
@@ -2887,7 +3303,11 @@ class unrealWidget(QtWidgets.QMainWindow,Ui_MainWindow):
             if self.level_treeWidget.selectedItems():
                 id = self.level_treeWidget.selectedItems()[0].text(0)
                 print(self.dataIdSelect(self.level_data, id))
-
+    def server_win(self):
+        self.serverWin = QWebEngineView()
+        self.serverWin.load(QUrl("http://%s:5000"%node_server))
+        self.serverWin.show()
+        self.serverWin.setFixedSize(1400, 750)
     def workOpenMenu(self,position):
         menu = QtWidgets.QMenu()
         openAction = menu.addAction("打开文件")
@@ -3086,7 +3506,7 @@ class MyLogin(QtWidgets.QMainWindow,Ui_Form):
         appIcon = QtGui.QIcon('%s/images/Icon128.png'%self.local_path)
         self.setWindowIcon(appIcon)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QtWidgets.QApplication.instance()
     if app is None:
         # this must excu or will crash
@@ -3094,4 +3514,4 @@ if __name__ == '__main__':
     log = MyLogin()
     log.show()
     log.setFixedSize(400, 320)
-    # sys.exit(app.exec_())
+    sys.exit(app.exec_())

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+  <div class="row align-items-start" style="height: 40px">
+  </div>
+  <a class="btn btn-primary" data-toggle="collapse" href="#Realistic" role="button" aria-expanded="false" aria-controls="Realistic">
+    写实模板
+  </a>
+  <a class="btn btn-primary" data-toggle="collapse" href="#Cartoon" role="button" aria-expanded="false" aria-controls="Cartoon">
+    卡通模板
+  </a>
+  <a class="btn btn-primary" data-toggle="collapse" href="#ThreeShadingTwo" role="button" aria-expanded="false" aria-controls="ThreeShadingTwo">
+    三渲二模板
+  </a>
+  <a class="btn btn-success" href="/uemat/add">
+    添加模板
+  </a>
+  <div class="collapse" id="Realistic">
+{% for each in dic.get('Realistic') %}
+    {% if dic.get('Realistic').index(each)%4==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matResume') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('Realistic').index(each)+1)%4==0 or each == dic.get('Realistic')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
+  <div class="collapse" id="Cartoon">
+{% for each in dic.get('Cartoon') %}
+    {% if dic.get('Cartoon').index(each)%4==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matResume') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('Cartoon').index(each)+1)%4==0 or each == dic.get('Cartoon')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
+  <div class="collapse" id="ThreeShadingTwo">
+{% for each in dic.get('ThreeShadingTwo') %}
+    {% if dic.get('ThreeShadingTwo').index(each)%4==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matResume') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('ThreeShadingTwo').index(each)+1)%4==0 or each == dic.get('ThreeShadingTwo')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
+</body>
+<script type="text/javascript">
+        function del(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderWaitDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+     function del_fail(obj) {
+        var item = $(obj).parent().parent();
+        var ad_info={};
+        ad_info.TaskId = $(obj).attr("id");
+        $.post("/admin/ad_post?action=ueRenderFailedDelete",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){item.remove()}
+    alert("Data: " + data + "\nStatus: " + status);
+    });
+    }
+
+        function commit(obj) {
+            var item = $(obj).parent().parent();
+            var ad_info={};
+            ad_info.TaskId = $(obj).attr("id");
+            $.post("/admin/ad_post?action=ueRenderCommit",ad_info ,
+      function(data,status){
+                if(data==='提交成功'){item.remove()}
+        alert("Data: " + data + "\nStatus: " + status);
+        });
+        }
+
+
+    </script>
+
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>搏击俱乐部重新开张了</title>
+</head>
+{% include 'head.html' %}
+<body>
+  <div class="row align-items-start" style="height: 50px">
+  </div>
+    <div class="row">
+        <div class="col">
+        </div>
+
+        <div class="col">
+        <div class="input-group mb-3">
+      <div class="input-group-prepend">
+        <label class="input-group-text" for="inputGroupSelect01">模板分类</label>
+      </div>
+      <select class="custom-select" id="inputGroupSelect01">
+        <option selected value="0">写实</option>
+        <option value="1">卡通</option>
+        <option value="2">三渲二</option>
+      </select>
+        </div>
+        </div>
+        <div class="col">
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+        </div>
+
+        <div class="col">
+            <div class="input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">模板中文名</span>
+              </div>
+              <input type="text" aria-label="First name" class="form-control" id="matCn" value="{{ dic.get('matCn') }}" onchange="$('#cardh5').text($(this).val())">
+            </div>
+        </div>
+
+        <div class="col">
+        </div>
+    </div>
+    <div class="row align-items-start" style="height: 20px">
+      </div>
+    <div class="row">
+        <div class="col">
+        </div>
+
+        <div class="col">
+            <div class="input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">模板编码</span>
+              </div>
+              <input type="text" aria-label="First name" class="form-control" id="matCode" value="{{ dic.get('matCode') }}" readonly>
+            </div>
+        </div>
+
+        <div class="col">
+        </div>
+    </div>
+    <div class="row align-items-start" style="height: 20px">
+      </div>
+    <div class="row">
+        <div class="col">
+        </div>
+
+        <div class="col">
+            <div class="input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">模板简述</span>
+              </div>
+              <input type="text" aria-label="First name" class="form-control" id="matResume" value="{{ dic.get('matResume') }}" onchange="$('#cardp').text($(this).val())">
+            </div>
+        </div>
+
+        <div class="col">
+        </div>
+    </div>
+    <div class="row align-items-start" style="height: 20px">
+      </div>
+    <div class="row">
+        <div class="col">
+        </div>
+
+        <div class="col">
+            <div class="input-group mb-3">
+              <div class="input-group-prepend">
+                <span class="input-group-text" id="inputGroupFileAddon01">微缩图</span>
+              </div>
+              <div class="custom-file">
+                <input type="file" class="custom-file-input" id="inputGroupFile01" aria-describedby="inputGroupFileAddon01"
+                accept=".png, .jpg" onchange="imgChange(this)">
+                <label class="custom-file-label" for="inputGroupFile01">选择文件</label>
+              </div>
+            </div>
+
+        </div>
+
+        <div class="col">
+        </div>
+    </div>
+    <div class="row align-items-start" style="height: 20px">
+          </div>
+    <div class="row">
+        <div class="col">
+        </div>
+        <div class="col">
+        </div>
+        <div class="col">
+            <div class="card" style="width:150px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+              <img class="card-img-top" src="{{ dic.get('img64') }}" style="height: 150px" id="shotcut">
+              <div class="card-body" style="padding: 5px">
+                <h5 class="card-title" id="cardh5">{{ dic.get('matCn') }}</h5>
+                <p class="card-text" id="cardp">{{ dic.get('matResume') }}</p>
+              </div>
+            </div>
+
+        </div>
+        <div class="col">
+            <button type="button" class="btn btn-primary btn-lg" onclick="window.location.href ='/uemat'">返回</button>
+             <br>
+            <br>
+            <button type="button" class="btn btn-primary btn-lg" onclick="upload()">更新模板</button>
+            <br>
+            <br>
+            <button type="button" class="btn btn-secondary btn-lg" onclick="del()">删除模板</button>
+        </div>
+        <div class="col">
+        </div>
+        <div class="col">
+        </div>
+    </div>
+</body>
+<script type="text/javascript">
+        var jsonDic = eval({{jsonDic|safe}});
+        var img64 = jsonDic.img64;
+        function del() {
+        ad_info={};
+        ad_info.matCode = $('#matCode').val();
+        $.post("/uemat/ad_post?action=del",ad_info ,
+  function(data,status){
+            if(data==='删除成功'){
+            alert("返回消息: " + data );
+            window.location.href ='/uemat'}
+            else {
+                alert("返回消息: " + data );
+            }
+    });
+    }
+
+        function imgChange(img) {
+            const reader = new FileReader();
+            reader.readAsDataURL(img.files[0]);
+             reader.onload = function (ev) {
+             img64 = this.result;
+             $('#shotcut').attr('src',img64)
+            };
+        }
+        function upload() {
+            typeArr = ['Realistic','Cartoon','ThreeShadingTwo'];
+            ad_info={};
+            ad_info.matType = typeArr[$('#inputGroupSelect01').val()];
+            ad_info.matCn = $('#matCn').val();
+            ad_info.matCode = $('#matCode').val();
+            ad_info.matResume = $('#matResume').val();
+            ad_info.img64 = img64;
+            $.post("/uemat/ad_post?action=update",ad_info ,
+  function(data,status){
+            if(data==='材质模板更新成功'){
+            alert("返回消息: " + data );
+            window.location.href ='/uemat'}
+            else {
+                alert("返回消息: " + data );
+            }
+            });
+
+        }
+    </script>
+
+</html>

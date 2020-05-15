@@ -6,27 +6,107 @@
 </head>
 {% include 'head.html' %}
 <body>
-<table class="table table-striped" style="width: 85%;margin-left: 20px">
-  <thead>
-    <tr>
-      <th scope="col">预览</th>
-      <th scope="col">材质模板名</th>
-      <th scope="col">材质插槽</th>
-        <th scope="col">地址</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for each in dic['render_wait'] %}
-        <tr>
-      <th scope="row">{{ dic['render_wait'].index(each)}}</th>
-            <td >{{ each.get('RenderArgument').get('RenderPath')}}</td>
-            <td >{{ each.get('date') }}</td>
-        <td >{{ each.get('addr') }}</td>
-        <td ><button type="button" class="btn btn-primary" onclick="del(this)" id="{{ each['TaskId'] }}">删除</button></td>
-        </tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <div class="row align-items-start" style="height: 40px">
+  </div>
+  <a class="btn btn-primary" data-toggle="collapse" href="#Realistic" role="button" aria-expanded="true" aria-controls="Realistic">
+    写实模板
+  </a>
+  <a class="btn btn-primary" data-toggle="collapse" href="#Cartoon" role="button" aria-expanded="false" aria-controls="Cartoon">
+    卡通模板
+  </a>
+  <a class="btn btn-primary" data-toggle="collapse" href="#ThreeShadingTwo" role="button" aria-expanded="false" aria-controls="ThreeShadingTwo">
+    三渲二模板
+  </a>
+  <a class="btn btn-success" href="/uemat/add">
+    添加模板
+  </a>
+  <div class="collapse show" id="Realistic">
+{% for each in dic.get('Realistic') %}
+    {% if dic.get('Realistic').index(each)%6==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matCode') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('Realistic').index(each)+1)%6==0 or each == dic.get('Realistic')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
+  <div class="collapse" id="Cartoon">
+{% for each in dic.get('Cartoon') %}
+    {% if dic.get('Cartoon').index(each)%4==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matResume') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('Cartoon').index(each)+1)%4==0 or each == dic.get('Cartoon')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
+  <div class="collapse" id="ThreeShadingTwo">
+{% for each in dic.get('ThreeShadingTwo') %}
+    {% if dic.get('ThreeShadingTwo').index(each)%4==0 %}
+    <div class="row">
+        <div class="col">
+        </div>
+    {% endif %}
+
+    <div class="col">
+        <a href="/uemat/update?matCode={{ each.get('matCode') }}" style="text-decoration: none">
+        <div class="card" style="width:180px;" onmouseover="this.style.opacity=0.6" onmouseout="this.style.opacity=1">
+          <img class="card-img-top" src="{{ each.get('img64') }}" style="height: 180px">
+          <div class="card-body" style="padding: 5px">
+            <h5 class="card-title">{{ each.get('matCn') }}</h5>
+            <p class="card-text">{{ each.get('matResume') }}</p>
+          </div>
+        </div>
+            </a>
+    </div>
+
+    {% if (dic.get('ThreeShadingTwo').index(each)+1)%4==0 or each == dic.get('ThreeShadingTwo')[-1] %}
+     <div class="col">
+     </div>
+    </div>
+      <div class="row align-items-start" style="height: 50px">
+      </div>
+    {% endif %}
+{% endfor %}
+    </div>
 </body>
 <script type="text/javascript">
         function del(obj) {

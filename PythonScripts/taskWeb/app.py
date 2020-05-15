@@ -13,7 +13,79 @@ db = conn.TaskList
 @app.route('/')
 def index():
     return render_template('index.html', title=u'欢迎到来到灼华俱乐部')
-
+@app.route('/test')
+def test():
+    dic = {}
+    Realistic = []
+    Cartoon = []
+    ThreeShadingTwo = []
+    for each in db.uemat.find({}, {'_id': 0}):
+        if each.get('matType') == 'Realistic':
+            Realistic.append(each)
+        if each.get('matType') == 'Cartoon':
+            Cartoon.append(each)
+        if each.get('matType') == 'ThreeShadingTwo':
+            ThreeShadingTwo.append(each)
+    dic['Realistic'] = Realistic
+    dic['Cartoon'] = Cartoon
+    dic['ThreeShadingTwo'] = ThreeShadingTwo
+    return render_template('test.html', title=u'欢迎到来到灼华俱乐部',dic=dic)
+@app.route('/uemat')
+def ueMat():
+    dic = {}
+    Realistic = []
+    Cartoon = []
+    ThreeShadingTwo = []
+    for each in db.uemat.find({},{'_id': 0}):
+        if each.get('matType') == 'Realistic':
+            Realistic.append(each)
+        if each.get('matType') == 'Cartoon':
+            Cartoon.append(each)
+        if each.get('matType') == 'ThreeShadingTwo':
+            ThreeShadingTwo.append(each)
+    dic['Realistic'] = Realistic
+    dic['Cartoon'] = Cartoon
+    dic['ThreeShadingTwo'] = ThreeShadingTwo
+    return render_template('ue_mat.html', title=u'欢迎到来到灼华俱乐部',dic=dic)
+@app.route('/uemat/add')
+def ueMatAdd():
+    return render_template('ue_matadd.html', title=u'欢迎到来到灼华俱乐部')
+@app.route('/uemat/update')
+def ueMatUpdate():
+    matCode = request.args.get('matCode')
+    dic = db.uemat.find_one({'matCode': matCode},{'_id': 0})
+    jsonDic = json.dumps(dic)
+    return render_template('ue_matupdate.html', title=u'欢迎到来到灼华俱乐部',dic=dic,jsonDic= jsonDic)
+@app.route('/uemat/ad_post',methods=['POST'])
+def ueMatAddPost():
+    action = request.args.get('action')
+    if action == 'add':
+        form_data = request.form.to_dict()
+        if db.uemat.find({'matCode': form_data['matCode']}).count():
+            return '材质模板编码已经存在'
+        elif form_data.get('matCn') and form_data.get('matType') and form_data.get('matCode') and form_data.get('img64'):
+            db.uemat.insert(form_data)
+            return '材质模板创建成功'
+        else:
+            return '数据不符合要求'
+    if action == 'update':
+        form_data = request.form.to_dict()
+        item = db.uemat.find_one({}, {'_id': 0, 'matCode': form_data['matCode']})
+        if item:
+            db.uemat.update({'matCode': form_data['matCode']}, {'$set': form_data})
+            return '材质模板更新成功'
+        else:
+            return '材质模板更新失败'
+    if action == 'del':
+        form_data = request.form.to_dict()
+        db.uemat.remove({'matCode': form_data['matCode']})
+        return '删除成功'
+@app.route('/uemat/json',methods=['get'])
+def ueMatJson():
+    temp = []
+    for each in db.uemat.find({}, {'_id': 0}):
+        temp.append(each)
+    return json.dumps(temp)
 @app.route('/maya/con',methods=['POST'])
 def maya_task():
     action = request.args.get('action')
