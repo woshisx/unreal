@@ -162,10 +162,14 @@ class StaticTextureMeshTask:
         options.set_editor_property('create_material', False)
         return options
 
-    def buildStaticMeshImportOptions(self):
+    def buildStaticMeshImportOptions(self, bCombine_meshs=False):
         options = unreal.FbxImportUI()
         static_mesh_import_data = unreal.FbxStaticMeshImportData()
         static_mesh_import_data.set_editor_property('combine_meshes', False)
+
+        if bCombine_meshs:
+            static_mesh_import_data.set_editor_property('combine_meshes', True)
+
         options.set_editor_property('import_mesh', True)
         options.set_editor_property('import_textures', False)
         options.set_editor_property('import_materials', False)
@@ -239,9 +243,9 @@ class StaticTextureMeshTask:
             print 'texutureFileName::: ' + texutureFileName + "  :::"
             self.refreshIMGAsset(texutureFileName)
 
-    def importStaticMesh(self, MeshFileName, destination_path):
+    def importStaticMesh(self, MeshFileName, destination_path, bCombine_meshs = False):
         taskList = []
-        taskList.append(self.buildImportTask(MeshFileName, destination_path, self.buildStaticMeshImportOptions()))
+        taskList.append(self.buildImportTask(MeshFileName, destination_path, self.buildStaticMeshImportOptions(bCombine_meshs)))
         self.executeImportTasks(taskList)
 
     def importSkeletalMesh(self, MeshFileName, destination_path):
@@ -259,7 +263,7 @@ class StaticTextureMeshTask:
         print(material)
 
         template_material_inst = material.split('_')
-        if len(template_material_inst) < 2:
+        if len(template_material_inst) < 2 or template_material_inst[-1] != 'Inst':
             return None, None
         material_inst = template_material_inst[-2] + '_' + template_material_inst[-1]
 
@@ -267,11 +271,16 @@ class StaticTextureMeshTask:
         filter_staticmesh = unreal.ARFilter(
             [], [package_path], [], [unreal.MaterialInstanceConstant.static_class().get_name()], [], True)
 
+
         AssetRegistry = unreal.AssetRegistryHelpers().get_asset_registry()
         MaterialInsDataArr = AssetRegistry.get_assets(filter_staticmesh)
+
         for material in MaterialInsDataArr:
             if str(material.package_name).split('/')[-1] == material_inst:
+
                 return str(material.package_name), material_inst
+
+        return None, None
 
     def create_material_instance(self, Material_matName, Pic_destination_path, texArr):
 
@@ -287,16 +296,6 @@ class StaticTextureMeshTask:
                 self.CreateInstanceOfMaterial(material_template['mat_inst_path'], Material_matName,
                                               Pic_destination_path, texArr, material_template)  # add by chenganggui
 
-        # if (Material_matName.find(Material_TemplateList[-1]) != -1):
-        #     # destination_path = "/"+os.path.dirname(Pic_Path).replace('M:',"Game")
-        #     # Pic_destination_path = "/Game" + os.path.dirname(destination_path).replace("\\", "/").split(":")[1]
-        #     # CreateInstanceOfMaterial(Material_Template,Material_matName,Pic_destination_path,textureTargetNameList,texArr)
-        #     print('Material_matName is {}, Pic_destination_path is {}'.format(
-        #         Material_matName, Pic_destination_path
-        #     ))
-
-        # 选择对应的材质模版
-        # self.CreateInstanceOfMaterial(self.Material_Template, Material_matName, Pic_destination_path, texArr) # add by chenganggui
     def add_slots(self, asset_path):
         filter_skeletalmesh = unreal.ARFilter(
             [], [asset_path], [], [unreal.SkeletalMesh.static_class().get_name()], [], True)
@@ -350,8 +349,10 @@ class StaticTextureMeshTask:
                     }
                 )
 
-        for template in self.MaterialsTemplateArr:
-            print(template)
+
+        # for template in self.MaterialsTemplateArr:
+        #     print('xx' + str(template))
+        # return
 
         # targetDir = 'M:\\DLQ2\\asset_work\\props\\hw\\Model\\texture\\publish'
 
@@ -366,6 +367,12 @@ class StaticTextureMeshTask:
         #     print child_of_root.tag, child_of_root.attrib
         MeshFileName = ""
         is_character_type = False
+        is_Combine_meshs = False
+        dict_static_type = {
+            'Character': False,
+            'Environment': False,
+            'Props': False
+        }
 
         for elem in root.iter():
             # print elem.tag, elem.attrib
@@ -379,6 +386,9 @@ class StaticTextureMeshTask:
                 print('MeshFileName is {}'.format(
                     MeshFileName
                 ))
+                static_type = elem.attrib.get('AssetType')
+                dict_static_type[static_type] = True
+
                 importType = 1
             elif (elem.tag == "SkeletalMesh"):
                 MeshFileName = elem.attrib.get('Path')
@@ -390,7 +400,7 @@ class StaticTextureMeshTask:
                 importType = 2
 
         # print "importType" + str(importType)
-        self.importIMGAsset(picList, destination_path) #// by chenganggui
+        #self.importIMGAsset(picList, destination_path) #// by chenganggui
         EditorAssetLibrary = unreal.EditorAssetLibrary()
         AssetRegistry = unreal.AssetRegistryHelpers().get_asset_registry()
         # print "destination_path.replace" + destination_path
@@ -415,7 +425,8 @@ class StaticTextureMeshTask:
                 # print('Material_matName is {} '.format(Material_matName))
 
                 Pic_destination_path = destination_path
-                self.create_material_instance(Material_matName, Pic_destination_path, texArr) # add by chenganggui
+                #self.create_material_instance(Material_matName, Pic_destination_path, texArr) # add by chenganggui
+
 
         # for f in os.listdir(targetDir):
         #     # print f
@@ -436,7 +447,14 @@ class StaticTextureMeshTask:
             # if (EditorAssetLibrary.does_directory_exist(package_path)):
             #     EditorAssetLibrary.delete_directory(package_path)
 
-            self.importStaticMesh(MeshFileName, destination_path) # add by chenganggui
+            if dict_static_type['Environment']:
+                print('not conbine' + '**'*10)
+                self.importStaticMesh(MeshFileName, destination_path) # add by chenganggui
+            else:
+                print('need conbine' + '**'*10)
+                self.importStaticMesh(MeshFileName, destination_path, bCombine_meshs=True)  # add by chenganggui
+
+
             print('package_path is {}'.format(package_path))
             self.resetStaticMeshMaterial(
                 package_path)  # '/Game/DLQ2/asset_work/props/hw/Model/texture/publish/image/hw_Texture_V01_fbx'
@@ -462,9 +480,6 @@ class StaticTextureMeshTask:
                 self.add_slots(package_path)
 
 
-import_task = StaticTextureMeshTask()
-# #dir = r'M:\DLQ2\asset_work\Scenes\zjynjgb\Model\texture\publish'
-#dir = r'M:\DLQ2\asset_work\character\luban\texture\publish'
-dir = r'M:\DLQ2\asset_work\character\luban\rig\publish'
-#
-import_task.importAsset(dir)
+# import_task = StaticTextureMeshTask()
+# dir = r'P:\TestProject\asset_work\Character\luban\texture\Publish'
+# import_task.importAsset(dir)
