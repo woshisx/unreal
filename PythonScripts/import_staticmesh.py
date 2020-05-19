@@ -400,7 +400,7 @@ class StaticTextureMeshTask:
                 importType = 2
 
         # print "importType" + str(importType)
-        #self.importIMGAsset(picList, destination_path) #// by chenganggui
+        self.importIMGAsset(picList, destination_path) #// by chenganggui
         EditorAssetLibrary = unreal.EditorAssetLibrary()
         AssetRegistry = unreal.AssetRegistryHelpers().get_asset_registry()
         # print "destination_path.replace" + destination_path
@@ -425,7 +425,7 @@ class StaticTextureMeshTask:
                 # print('Material_matName is {} '.format(Material_matName))
 
                 Pic_destination_path = destination_path
-                #self.create_material_instance(Material_matName, Pic_destination_path, texArr) # add by chenganggui
+                self.create_material_instance(Material_matName, Pic_destination_path, texArr) # add by chenganggui
 
 
         # for f in os.listdir(targetDir):
@@ -480,6 +480,9 @@ class StaticTextureMeshTask:
                 self.add_slots(package_path)
 
 
-# import_task = StaticTextureMeshTask()
-# dir = r'P:\TestProject\asset_work\Character\luban\texture\Publish'
-# import_task.importAsset(dir)
+import_task = StaticTextureMeshTask()
+# #dir = r'M:\DLQ2\asset_work\Scenes\zjynjgb\Model\texture\publish'
+#dir = r'P:\TestProject\asset_work\Environment\zjynjgb\texture\Publish'
+dir = r'P:\TestProject\asset_work\Character\luban\texture\Publish'
+#
+import_task.importAsset(dir)
