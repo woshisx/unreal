@@ -1,0 +1,55 @@
+-
+  {
+  'label': '任务id',
+  'key': 'task_id',
+  'searchable': True,
+  'exclusive': False,
+  }
+-
+  {
+  'label': '任务名',
+  'key': 'task_name',
+  'searchable': True,
+  'exclusive': False,
+  }
+
+-
+  {
+  'label': '资产类型',
+  'key': 'asset_category',
+  'searchable': True,
+  'exclusive': False
+  }
+-
+  {
+  'label': '资产级别',
+  'key': 'asset_grade',
+  'searchable': True,
+  'exclusive': False
+  }
+-
+  {
+  'label': '开始时间',
+  'key': 'plan_start_time',
+  'searchable': True,
+  'width':150
+  }
+-
+  {
+  'label': '结束时间',
+  'key': 'plan_end_time',
+  'searchable': True,
+  'width':150
+  }
+-
+  {
+  'label': '任务状态',
+  'key': 'status',
+  'searchable': True,
+  }
+-
+  {
+  'label': '执行人',
+  'key': 'executor',
+  'searchable': True,
+  }

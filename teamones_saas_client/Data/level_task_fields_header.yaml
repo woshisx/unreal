@@ -1,0 +1,45 @@
+-
+  {
+  'label': '任务id',
+  'key': 'task_id',
+  'searchable': True,
+  'exclusive': False
+  }
+-
+  {
+  'label': '任务名',
+  'key': 'task_name',
+  'searchable': True,
+  'exclusive': False
+  }
+-
+  {
+  'label': '关卡等级',
+  'key': 'level_grade',
+  'searchable': True,
+  'exclusive': False
+  }
+-
+  {
+  'label': '开始时间',
+  'key': 'plan_start_time',
+  'searchable': True,
+  }
+-
+  {
+  'label': '结束时间',
+  'key': 'plan_end_time',
+  'searchable': True,
+  }
+-
+  {
+  'label': '任务状态',
+  'key': 'status',
+  'searchable': True,
+  }
+-
+  {
+  'label': '执行人',
+  'key': 'executor',
+  'searchable': True,
+  }

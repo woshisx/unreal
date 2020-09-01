@@ -1,0 +1,26 @@
+
+QStackedWidget#rightWidget{background: #3b3a3a;}
+QGroupBox#leftWidget{
+	border:none;
+}
+#userSetBtn {
+	background-image: url(images/user.png);
+	border:none;
+}
+#userSetBtn:hover {
+	background-image: url(images/user_hover.png);
+}
+
+
+#TaskListBtn {
+	background-image: url(images/icon01.png);
+	border:none;
+}
+#projLabel{
+	font-family: "Microsoft YaHei";
+	color:#289dcd;
+	font-size: 40px;
+}
+#projLabel:hover{
+	background:qlineargradient(spread:pad,x1:0,y1:0,x2:0,y2:1,stop:0 gray,stop:1 #525252);
+}
